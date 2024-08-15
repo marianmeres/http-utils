@@ -32,7 +32,7 @@ suite.test('HTTP_ERROR', () => {
 	assert(e.statusText === HTTP_STATUS.ERROR_SERVER.BAD_GATEWAY.TEXT);
 });
 
-suite.only('createHttpErrorByCode', () => {
+suite.test('createHttpErrorByCode', () => {
 	// well known
 	let e = createHttpError(404, null, '{"foo":"bar"}', { baz: 'bat' });
 
@@ -56,6 +56,9 @@ suite.only('createHttpErrorByCode', () => {
 	assert(e.cause === undefined);
 
 	// custom message
+	e = createHttpError(123, 'Hey', '123');
+	assert(e.toString() === 'HttpInternalServerError: Hey');
+	assert(e.body === 123);
 });
 
 export default suite;
