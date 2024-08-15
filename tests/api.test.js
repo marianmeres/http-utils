@@ -20,7 +20,7 @@ const collectBody = async (request) =>
 	});
 
 const suite = new TestRunner(path.basename(fileURLToPath(import.meta.url)), {
-	before: async () => {
+	beforeEach: async () => {
 		server = createServer(async (req, res) => {
 			res.setHeader('Content-Type', 'application/json');
 			if (req.url === '/echo') {
@@ -37,7 +37,7 @@ const suite = new TestRunner(path.basename(fileURLToPath(import.meta.url)), {
 		});
 		return new Promise((resolve) => server.listen(port, hostname, resolve));
 	},
-	after: async () => new Promise((resolve) => server.close(resolve)),
+	afterEach: async () => new Promise((resolve) => server.close(resolve)),
 });
 
 suite.test('createHttpApi GET', async () => {
@@ -45,6 +45,15 @@ suite.test('createHttpApi GET', async () => {
 	let respHeaders = {};
 
 	let r = await api.get(`${url}/echo`, {}, respHeaders);
+	assert(r.foo === 'bar');
+	assert(respHeaders.__http_status_code__ === 200);
+});
+
+suite.test('createHttpApi base option', async () => {
+	let api = createHttpApi(url);
+	let respHeaders = {};
+
+	let r = await api.get(`/echo`, {}, respHeaders);
 	assert(r.foo === 'bar');
 	assert(respHeaders.__http_status_code__ === 200);
 });
@@ -73,6 +82,23 @@ suite.test('createHttpApi error', async () => {
 	assert(err.body.some.deep === 'message');
 });
 
+suite.test('createHttpApi error { raw: true }', async () => {
+	let api = createHttpApi();
+
+	let r = await api.get(`${url}/asdf`, { raw: true });
+	assert(r instanceof Response);
+	assert(!r.ok);
+});
+
+suite.test('createHttpApi error { assert: false } does not throw', async () => {
+	let api = createHttpApi();
+	let respHeaders = {};
+
+	let r = await api.get(`${url}/asdf`, { assert: false }, respHeaders);
+	assert(r.some.deep === 'message');
+	assert(respHeaders.__http_status_code__ === 404);
+});
+
 suite.test('createHttpApi POST', async () => {
 	let api = createHttpApi();
 	let respHeaders = {};
@@ -83,7 +109,7 @@ suite.test('createHttpApi POST', async () => {
 });
 
 suite.test('createHttpApi merge default params', async () => {
-	let api = createHttpApi({
+	let api = createHttpApi(null, {
 		headers: { authorization: 'Bearer foo' },
 		method: 'must be ignored',
 		path: 'must be ignored',

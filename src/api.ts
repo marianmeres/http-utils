@@ -2,7 +2,7 @@ import { dset } from 'dset/merge';
 import { createHttpError } from './error.js';
 
 // this is all very opinionated and may not be useful for every use case...
-// there is no magic added over plain fetch calls
+// there is no magic added over plain fetch calls, just more opinionated and dry api
 
 interface BaseParams {
 	method: 'GET' | 'POST' | 'PATCH' | 'DELETE' | 'PUT';
@@ -16,6 +16,7 @@ interface FetchParams {
 	signal?: any;
 	credentials?: null | 'omit' | 'same-origin' | 'include';
 	raw?: null | boolean;
+	assert?: null | boolean;
 }
 
 type BaseFetchParams = BaseParams & FetchParams; // Exclude<Drinks, Soda> |
@@ -84,7 +85,9 @@ const _fetch = async (
 	// prettier-ignore
 	try { body = JSON.parse(body); } catch (e) {}
 
-	if (!r.ok) {
+	params.assert ??= true; // default is true
+
+	if (!r.ok && params.assert) {
 		throw createHttpError(r.status, null, body);
 	}
 
@@ -92,6 +95,7 @@ const _fetch = async (
 };
 
 export const createHttpApi = (
+	base: string | null,
 	defaults?: Partial<BaseFetchParams> | (() => Promise<Partial<BaseFetchParams>>)
 ) => {
 	const _merge = (a: any, b: any): any => {
@@ -118,6 +122,7 @@ export const createHttpApi = (
 			respHeaders = null,
 			_dumpParams = false
 		) {
+			path = `${base || ''}` + path;
 			return _fetch(
 				_merge(await _getDefs(), { ...params, method: 'GET', path }),
 				respHeaders,
@@ -133,6 +138,7 @@ export const createHttpApi = (
 			respHeaders = null,
 			_dumpParams = false
 		) {
+			path = `${base || ''}` + path;
 			return _fetch(
 				_merge(await _getDefs(), { ...(params || {}), data, method: 'POST', path }),
 				respHeaders,
@@ -148,6 +154,7 @@ export const createHttpApi = (
 			respHeaders = null,
 			_dumpParams = false
 		) {
+			path = `${base || ''}` + path;
 			return _fetch(
 				_merge(await _getDefs(), { ...(params || {}), data, method: 'PUT', path }),
 				respHeaders,
@@ -163,6 +170,7 @@ export const createHttpApi = (
 			respHeaders = null,
 			_dumpParams = false
 		) {
+			path = `${base || ''}` + path;
 			return _fetch(
 				_merge(await _getDefs(), { ...(params || {}), data, method: 'PATCH', path }),
 				respHeaders,
@@ -179,6 +187,7 @@ export const createHttpApi = (
 			respHeaders = null,
 			_dumpParams = false
 		) {
+			path = `${base || ''}` + path;
 			return _fetch(
 				_merge(await _getDefs(), { ...(params || {}), data, method: 'DELETE', path }),
 				respHeaders,

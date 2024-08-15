@@ -2,7 +2,7 @@ export class HTTP_STATUS {
 	// 1xx
 	// prettier-ignore
 	static readonly INFO = {
-        CONTINUE:                        { CODE: 100, TEXT: 'Continue' },
+		CONTINUE:                        { CODE: 100, TEXT: 'Continue' },
 		SWITCHING_PROTOCOLS:             { CODE: 101, TEXT: 'Switching Protocols' },
 		PROCESSING:                      { CODE: 102, TEXT: 'Processing' },
 		EARLY_HINTS:                     { CODE: 103, TEXT: 'Early Hints' },
@@ -11,7 +11,7 @@ export class HTTP_STATUS {
 	// 2xx
 	// prettier-ignore
 	static readonly SUCCESS = {
-        OK:                              { CODE: 200, TEXT: 'OK' },
+		OK:                              { CODE: 200, TEXT: 'OK' },
 		NON_AUTHORITATIVE_INFO:          { CODE: 203, TEXT: 'Non-Authoritative Information' },
 		ACCEPTED:                        { CODE: 202, TEXT: 'Accepted' },
 		NO_CONTENT:                      { CODE: 204, TEXT: 'No Content' },
