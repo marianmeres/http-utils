@@ -104,15 +104,14 @@ export const createHttpApi = (
 		return wrap.result;
 	};
 
-	const _getDefs = async () => {
-		return new Promise<Partial<BaseFetchParams>>(async (resolve) => {
+	const _getDefs = async () =>
+		new Promise<Partial<BaseFetchParams>>(async (resolve) => {
 			if (typeof defaults === 'function') {
-				resolve(await defaults());
+				resolve({ ...(await defaults()) });
 			} else {
-				resolve(defaults || {});
+				resolve({ ...(defaults || {}) });
 			}
 		});
-	};
 
 	return {
 		// GET
