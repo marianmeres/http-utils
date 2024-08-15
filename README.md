@@ -5,7 +5,7 @@ A few [sweet](https://en.wikipedia.org/wiki/Syntactic_sugar) `fetch` helpers.
 ## Example
 
 ```javascript
-import { HTTP_ERROR, createHttpApi } from '@marianmeres/http-utils';
+import { HTTP_ERROR, HTTP_STATUS, createHttpApi } from '@marianmeres/http-utils';
 
 // create api helper
 const api = createHttpApi(
@@ -27,6 +27,9 @@ try {
 } catch (e) {
     // see HTTP_ERROR for more
     assert(e instanceof HTTP_ERROR.NotFound);
+    assert(e.toString() === 'HttpNotFoundError: Not Found');
+    assert(e.status === HTTP_STATUS.ERROR_CLIENT.NOT_FOUND.CODE);
+    assert(e.statusText === HTTP_STATUS.ERROR_CLIENT.NOT_FOUND.TEXT);
     assert(e.body.message === 'hey');
 }
 
