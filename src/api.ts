@@ -95,7 +95,7 @@ const _fetch = async (
 };
 
 export const createHttpApi = (
-	base: string | null,
+	base?: string | null,
 	defaults?: Partial<BaseFetchParams> | (() => Promise<Partial<BaseFetchParams>>)
 ) => {
 	const _merge = (a: any, b: any): any => {
