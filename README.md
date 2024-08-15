@@ -1,6 +1,6 @@
 # @marianmeres/http-utils
 
-A few [sweet](https://en.wikipedia.org/wiki/Syntactic_sugar) `fetch` helpers.
+A few opinionated [sweet](https://en.wikipedia.org/wiki/Syntactic_sugar) `fetch` helpers.
 
 ## Example
 
