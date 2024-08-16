@@ -5,7 +5,7 @@ class HttpError extends Error {
 	public name = 'HttpError';
 	public status = HTTP_STATUS.ERROR_SERVER.INTERNAL_SERVER_ERROR.CODE;
 	public statusText = HTTP_STATUS.ERROR_SERVER.INTERNAL_SERVER_ERROR.TEXT;
-	public body: string | null = null;
+	public detail: any = null;
 }
 
 // some more specific instances of the well known ones...
@@ -128,11 +128,13 @@ const _wellKnownCtorMap = {
 	'503': ServiceUnavailable,
 };
 
-// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/cause
 export const createHttpError = (
 	code: number | string,
 	message?: string | null,
-	body?: any,
+	// arbitrary details, typically response text (will be JSON.parse-d if text is valid json string)
+	detail?: any,
+	// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/cause
+	// arbitrary further details provided manually
 	cause?: any
 ) => {
 	const fallback = HTTP_STATUS.ERROR_SERVER.INTERNAL_SERVER_ERROR;
@@ -144,9 +146,9 @@ export const createHttpError = (
 	const statusText = found?.TEXT ?? fallback.TEXT;
 
 	// opinionated convention
-	if (typeof body === 'string') {
+	if (typeof detail === 'string') {
 		// prettier-ignore
-		try { body = JSON.parse(body); } catch (e) {}
+		try { detail = JSON.parse(detail); } catch (e) {}
 	}
 
 	// try to find the well known one, otherwise fallback to generic
@@ -156,7 +158,7 @@ export const createHttpError = (
 	let e = new ctor(message || statusText, { cause });
 	e.status = found?.CODE ?? fallback.CODE;
 	e.statusText = statusText;
-	e.body = body;
+	e.detail = detail;
 
 	return e;
 };

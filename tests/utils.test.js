@@ -38,27 +38,27 @@ suite.test('createHttpErrorByCode', () => {
 
 	assert(e instanceof HTTP_ERROR.NotFound);
 	assert(e.toString() === 'HttpNotFoundError: Not Found');
-	assert(e.body.foo === 'bar');
+	assert(e.detail.foo === 'bar');
 	assert(e.cause.baz === 'bat');
 
 	// NOT well known
 	e = createHttpError(423, null, '{invalid json}', 123);
 	assert(e instanceof HTTP_ERROR.HttpError);
 	assert(e.toString() === 'HttpError: Locked');
-	assert(e.body === '{invalid json}');
+	assert(e.detail === '{invalid json}');
 	assert(e.cause === 123);
 
 	// unknown code must fall back to 500
 	e = createHttpError(123, null, '123');
 	assert(e instanceof HTTP_ERROR.InternalServerError);
 	assert(e.toString() === 'HttpInternalServerError: Internal Server Error');
-	assert(e.body === 123); // '123' is a valid json string
+	assert(e.detail === 123); // '123' is a valid json string
 	assert(e.cause === undefined);
 
 	// custom message
 	e = createHttpError(123, 'Hey', '123');
 	assert(e.toString() === 'HttpInternalServerError: Hey');
-	assert(e.body === 123);
+	assert(e.detail === 123);
 });
 
 export default suite;

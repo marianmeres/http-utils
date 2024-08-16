@@ -30,7 +30,7 @@ try {
     assert(e.toString() === 'HttpNotFoundError: Not Found');
     assert(e.status === HTTP_STATUS.ERROR_CLIENT.NOT_FOUND.CODE);
     assert(e.statusText === HTTP_STATUS.ERROR_CLIENT.NOT_FOUND.TEXT);
-    assert(e.body.message === 'hey');
+    assert(e.detail.message === 'hey');
 }
 
 // EXAMPLE: assuming `/foo` returns 404 header and json {"message":"hey"}
