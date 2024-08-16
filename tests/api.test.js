@@ -79,7 +79,7 @@ suite.test('createHttpApi error', async () => {
 	}
 
 	assert(err instanceof HTTP_ERROR.NotFound);
-	assert(err.detail.some.deep === 'message');
+	assert(err.cause.some.deep === 'message');
 });
 
 suite.test('createHttpApi error { raw: true }', async () => {

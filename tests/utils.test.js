@@ -34,31 +34,28 @@ suite.test('HTTP_ERROR', () => {
 
 suite.test('createHttpErrorByCode', () => {
 	// well known
-	let e = createHttpError(404, null, '{"foo":"bar"}', { baz: 'bat' });
+	let e = createHttpError(404, null, '{"foo":"bar"}');
 
 	assert(e instanceof HTTP_ERROR.NotFound);
 	assert(e.toString() === 'HttpNotFoundError: Not Found');
-	assert(e.detail.foo === 'bar');
-	assert(e.cause.baz === 'bat');
+	assert(e.cause.foo === 'bar');
 
 	// NOT well known
-	e = createHttpError(423, null, '{invalid json}', 123);
+	e = createHttpError(423, null, '{invalid json}');
 	assert(e instanceof HTTP_ERROR.HttpError);
 	assert(e.toString() === 'HttpError: Locked');
-	assert(e.detail === '{invalid json}');
-	assert(e.cause === 123);
+	assert(e.cause === '{invalid json}');
 
 	// unknown code must fall back to 500
 	e = createHttpError(123, null, '123');
 	assert(e instanceof HTTP_ERROR.InternalServerError);
 	assert(e.toString() === 'HttpInternalServerError: Internal Server Error');
-	assert(e.detail === 123); // '123' is a valid json string
-	assert(e.cause === undefined);
+	assert(e.cause === 123); // '123' is a valid json string
 
 	// custom message
 	e = createHttpError(123, 'Hey', '123');
 	assert(e.toString() === 'HttpInternalServerError: Hey');
-	assert(e.detail === 123);
+	assert(e.cause === 123);
 });
 
 export default suite;
