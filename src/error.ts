@@ -136,16 +136,13 @@ export const createHttpError = (
 	// (will be JSON.parse-d if the content is a valid json string)
 	body?: string | null,
 	// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/cause
-	// arbitrary details, typically response text (will be JSON.parse-d if text is a valid json string)
+	// arbitrary details, typically response text (will be JSON.parse-d if the content is a valid json string)
 	cause?: any
 ) => {
 	const fallback = HTTP_STATUS.ERROR_SERVER.INTERNAL_SERVER_ERROR;
 
 	code = Number(code);
 	if (isNaN(code) || !(code >= 400 && code < 600)) code = fallback.CODE;
-
-	const found = HTTP_STATUS.findByCode(code);
-	const statusText = found?.TEXT ?? fallback.TEXT;
 
 	// opinionated convention
 	if (typeof body === 'string') {
@@ -163,6 +160,11 @@ export const createHttpError = (
 	const ctor =
 		_wellKnownCtorMap[`${code}` as keyof typeof _wellKnownCtorMap] ?? HttpError;
 
+	//
+	const found = HTTP_STATUS.findByCode(code);
+	const statusText = found?.TEXT ?? fallback.TEXT;
+
+	//
 	let e = new ctor(message || statusText, { cause });
 	e.status = found?.CODE ?? fallback.CODE;
 	e.statusText = statusText;
