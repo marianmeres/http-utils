@@ -3,8 +3,10 @@ import { HTTP_STATUS } from './status.js';
 // opinionated base for all
 class HttpError extends Error {
 	public name = 'HttpError';
-	public status = HTTP_STATUS.ERROR_SERVER.INTERNAL_SERVER_ERROR.CODE;
-	public statusText = HTTP_STATUS.ERROR_SERVER.INTERNAL_SERVER_ERROR.TEXT;
+	// props simulating fetch Response
+	public status: number = HTTP_STATUS.ERROR_SERVER.INTERNAL_SERVER_ERROR.CODE;
+	public statusText: string = HTTP_STATUS.ERROR_SERVER.INTERNAL_SERVER_ERROR.TEXT;
+	public body: any = null;
 }
 
 // some more specific instances of the well known ones...
@@ -130,8 +132,11 @@ const _wellKnownCtorMap = {
 export const createHttpError = (
 	code: number | string,
 	message?: string | null,
+	// arbitrary content, typically http response body which threw this error
+	// (will be JSON.parse-d if the content is a valid json string)
+	body?: string | null,
 	// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/cause
-	// arbitrary details, typically response text (will be JSON.parse-d if text is valid json string)
+	// arbitrary details, typically response text (will be JSON.parse-d if text is a valid json string)
 	cause?: any
 ) => {
 	const fallback = HTTP_STATUS.ERROR_SERVER.INTERNAL_SERVER_ERROR;
@@ -141,6 +146,12 @@ export const createHttpError = (
 
 	const found = HTTP_STATUS.findByCode(code);
 	const statusText = found?.TEXT ?? fallback.TEXT;
+
+	// opinionated convention
+	if (typeof body === 'string') {
+		// prettier-ignore
+		try { body = JSON.parse(body); } catch (e) {}
+	}
 
 	// opinionated convention
 	if (typeof cause === 'string') {
@@ -155,6 +166,7 @@ export const createHttpError = (
 	let e = new ctor(message || statusText, { cause });
 	e.status = found?.CODE ?? fallback.CODE;
 	e.statusText = statusText;
+	e.body = body;
 
 	return e;
 };

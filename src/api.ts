@@ -68,16 +68,19 @@ const _fetch = async (
 	const r = await _fetchRaw(params);
 	if (params.raw) return r;
 
+	//
+	const headers: any = [...r.headers.entries()].reduce(
+		(m, [k, v]) => ({ ...m, [k]: v }),
+		{}
+	);
+
 	// quick-n-dirty reference to headers (so it's still accessible over this api wrap)
 	if (respHeaders) {
 		Object.assign(
 			respHeaders,
-			[...r.headers.entries()].reduce((m, [k, v]) => ({ ...m, [k]: v }), {}),
+			{ ...headers },
 			// adding status/text under special keys
-			{
-				__http_status_code__: r.status,
-				__http_status_text__: r.statusText,
-			}
+			{ __http_status_code__: r.status, __http_status_text__: r.statusText }
 		);
 	}
 
@@ -88,7 +91,15 @@ const _fetch = async (
 	params.assert ??= true; // default is true
 
 	if (!r.ok && params.assert) {
-		throw createHttpError(r.status, null, body);
+		throw createHttpError(r.status, null, body, {
+			method: params.method,
+			path: params.path,
+			response: {
+				status: r.status,
+				statusText: r.statusText,
+				headers,
+			},
+		});
 	}
 
 	return body;

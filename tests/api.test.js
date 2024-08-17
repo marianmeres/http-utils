@@ -23,6 +23,7 @@ const suite = new TestRunner(path.basename(fileURLToPath(import.meta.url)), {
 	beforeEach: async () => {
 		server = createServer(async (req, res) => {
 			res.setHeader('Content-Type', 'application/json');
+			res.setHeader('hey', 'ho');
 			if (req.url === '/echo') {
 				res.statusCode = 200;
 				if (req.method === 'POST') {
@@ -79,7 +80,8 @@ suite.test('createHttpApi error', async () => {
 	}
 
 	assert(err instanceof HTTP_ERROR.NotFound);
-	assert(err.cause.some.deep === 'message');
+	assert(err.body.some.deep === 'message');
+	assert(err.cause.response.headers.hey === 'ho');
 });
 
 suite.test('createHttpApi error { raw: true }', async () => {
