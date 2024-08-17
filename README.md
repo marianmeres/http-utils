@@ -30,7 +30,10 @@ try {
     assert(e.toString() === 'HttpNotFoundError: Not Found');
     assert(e.status === HTTP_STATUS.ERROR_CLIENT.NOT_FOUND.CODE);
     assert(e.statusText === HTTP_STATUS.ERROR_CLIENT.NOT_FOUND.TEXT);
-    assert(e.detail.message === 'hey');
+    // `body` is a custom prop containing the raw http response body text (JSON.parse-d if available)
+    assert(e.body.message === 'hey');
+    // `cause` is a standart Error prop, containg here some default debug info
+    assert(err.cause.response.headers)
 }
 
 // EXAMPLE: assuming `/foo` returns 404 header and json {"message":"hey"}
@@ -46,6 +49,11 @@ assert(r.message === 'created');
 // EXAMPLE: raw Response
 const r = await api.get('/resource', { raw: true });
 assert(r instanceof Response);
+
+// EXAMPLE: access to response headers
+let respHeaders = {};
+const r = await api.get('/resource', null, respHeaders);
+assert(Object.keys(respHeaders).length)
 ```
 
 See [`HTTP_STATUS`](./src/status.ts) and [`HTTP_ERROR`](./src/error.ts) for more.
