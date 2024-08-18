@@ -132,7 +132,7 @@ export const createHttpApi = (
 			respHeaders = null,
 			_dumpParams = false
 		) {
-			path = `${base || ''}` + path;
+			path = `${base || ''}${path || ''}`;
 			return _fetch(
 				_merge(await _getDefs(), { ...params, method: 'GET', path }),
 				respHeaders,
@@ -148,7 +148,7 @@ export const createHttpApi = (
 			respHeaders = null,
 			_dumpParams = false
 		) {
-			path = `${base || ''}` + path;
+			path = `${base || ''}${path || ''}`;
 			return _fetch(
 				_merge(await _getDefs(), { ...(params || {}), data, method: 'POST', path }),
 				respHeaders,
@@ -164,7 +164,7 @@ export const createHttpApi = (
 			respHeaders = null,
 			_dumpParams = false
 		) {
-			path = `${base || ''}` + path;
+			path = `${base || ''}${path || ''}`;
 			return _fetch(
 				_merge(await _getDefs(), { ...(params || {}), data, method: 'PUT', path }),
 				respHeaders,
@@ -180,7 +180,7 @@ export const createHttpApi = (
 			respHeaders = null,
 			_dumpParams = false
 		) {
-			path = `${base || ''}` + path;
+			path = `${base || ''}${path || ''}`;
 			return _fetch(
 				_merge(await _getDefs(), { ...(params || {}), data, method: 'PATCH', path }),
 				respHeaders,
@@ -197,7 +197,7 @@ export const createHttpApi = (
 			respHeaders = null,
 			_dumpParams = false
 		) {
-			path = `${base || ''}` + path;
+			path = `${base || ''}${path || ''}`;
 			return _fetch(
 				_merge(await _getDefs(), { ...(params || {}), data, method: 'DELETE', path }),
 				respHeaders,
