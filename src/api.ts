@@ -143,7 +143,7 @@ export const createHttpApi = (
 		// POST
 		async post(
 			path: string,
-			data = null,
+			data: any = null,
 			params?: FetchParams,
 			respHeaders: any = null,
 			_dumpParams = false
