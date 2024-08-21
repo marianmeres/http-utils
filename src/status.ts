@@ -1,8 +1,8 @@
+// prettier-ignore
 export class HTTP_STATUS {
-	// special case shortcut
-	static readonly OK = 200;
+	// full db
+
 	// 1xx
-	// prettier-ignore
 	static readonly INFO = {
 		CONTINUE:                        { CODE: 100, TEXT: 'Continue' },
 		SWITCHING_PROTOCOLS:             { CODE: 101, TEXT: 'Switching Protocols' },
@@ -11,7 +11,6 @@ export class HTTP_STATUS {
 	};
 
 	// 2xx
-	// prettier-ignore
 	static readonly SUCCESS = {
 		OK:                              { CODE: 200, TEXT: 'OK' },
 		CREATED:                         { CODE: 201, TEXT: 'Created' },
@@ -26,7 +25,6 @@ export class HTTP_STATUS {
 	};
 
 	// 3xx
-	// prettier-ignore
 	static readonly REDIRECT = {
 		MUTLIPLE_CHOICES:                { CODE: 300, TEXT: 'Multiple Choices' },
 		MOVED_PERMANENTLY:               { CODE: 301, TEXT: 'Moved Permanently' },
@@ -38,7 +36,6 @@ export class HTTP_STATUS {
 	};
 
 	// 4xx
-	// prettier-ignore
 	static readonly ERROR_CLIENT = {
 		BAD_REQUEST:                     { CODE: 400, TEXT: 'Bad Request' },
 		UNAUTHORIZED:                    { CODE: 401, TEXT: 'Unauthorized' },
@@ -87,16 +84,42 @@ export class HTTP_STATUS {
 		NETWORK_AUTH_REQUIRED:           { CODE: 511, TEXT: 'Network Authentication Required' },
 	};
 
+	// few hand picked direct code shortcuts
+	
+	// 2xx
+	static readonly OK                    = HTTP_STATUS.SUCCESS.OK.CODE;
+	static readonly CREATED               = HTTP_STATUS.SUCCESS.CREATED.CODE;
+	static readonly ACCEPTED              = HTTP_STATUS.SUCCESS.ACCEPTED.CODE;
+	static readonly NO_CONTENT            = HTTP_STATUS.SUCCESS.NO_CONTENT.CODE;
+
+	// 3xx
+	static readonly MUTLIPLE_CHOICES      = HTTP_STATUS.REDIRECT.MUTLIPLE_CHOICES.CODE;
+	static readonly FOUND                 = HTTP_STATUS.REDIRECT.FOUND.CODE;
+	static readonly NOT_MODIFIED          = HTTP_STATUS.REDIRECT.NOT_MODIFIED.CODE;
+	static readonly MOVED_PERMANENTLY     = HTTP_STATUS.REDIRECT.MOVED_PERMANENTLY.CODE;
+	static readonly TEMPORARY_REDIRECT    = HTTP_STATUS.REDIRECT.TEMPORARY_REDIRECT.CODE;
+	static readonly PERMANENT_REDIRECT    = HTTP_STATUS.REDIRECT.PERMANENT_REDIRECT.CODE;
+
+	// 4xx
+	static readonly BAD_REQUEST           = HTTP_STATUS.ERROR_CLIENT.BAD_REQUEST.CODE;
+	static readonly UNAUTHORIZED          = HTTP_STATUS.ERROR_CLIENT.UNAUTHORIZED.CODE;
+	static readonly FORBIDDEN             = HTTP_STATUS.ERROR_CLIENT.FORBIDDEN.CODE;
+	static readonly NOT_FOUND             = HTTP_STATUS.ERROR_CLIENT.NOT_FOUND.CODE;
+	static readonly METHOD_NOT_ALLOWED    = HTTP_STATUS.ERROR_CLIENT.METHOD_NOT_ALLOWED.CODE;
+	static readonly CONFLICT              = HTTP_STATUS.ERROR_CLIENT.CONFLICT.CODE;
+	static readonly GONE                  = HTTP_STATUS.ERROR_CLIENT.GONE.CODE;
+
+	// 5xx
+	static readonly INTERNAL_SERVER_ERROR = HTTP_STATUS.ERROR_SERVER.INTERNAL_SERVER_ERROR.CODE;
+	static readonly NOT_IMPLEMENTED       = HTTP_STATUS.ERROR_SERVER.NOT_IMPLEMENTED.CODE;
+	static readonly SERVICE_UNAVAILABLE   = HTTP_STATUS.ERROR_SERVER.SERVICE_UNAVAILABLE.CODE;
+
 	//
 	static findByCode(
 		code: number | string
 	): { CODE: number; TEXT: string; _TYPE: string; _KEY: string } | null {
 		const keys: (keyof typeof HTTP_STATUS)[] = [
-			'INFO',
-			'SUCCESS',
-			'REDIRECT',
-			'ERROR_CLIENT',
-			'ERROR_SERVER',
+			'INFO', 'SUCCESS', 'REDIRECT', 'ERROR_CLIENT', 'ERROR_SERVER',
 		];
 		for (const _TYPE of keys) {
 			for (const [_KEY, data] of Object.entries(HTTP_STATUS[_TYPE]) as any) {
