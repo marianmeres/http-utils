@@ -84,7 +84,7 @@ const _fetch = async (
 		);
 	}
 
-	let body: string = await r.text();
+	let body: any = await r.text();
 	// prettier-ignore
 	try { body = JSON.parse(body); } catch (e) {}
 
