@@ -12,8 +12,9 @@ export class HTTP_STATUS {
 	// prettier-ignore
 	static readonly SUCCESS = {
 		OK:                              { CODE: 200, TEXT: 'OK' },
-		NON_AUTHORITATIVE_INFO:          { CODE: 203, TEXT: 'Non-Authoritative Information' },
+		CREATED:                         { CODE: 201, TEXT: 'Created' },
 		ACCEPTED:                        { CODE: 202, TEXT: 'Accepted' },
+		NON_AUTHORITATIVE_INFO:          { CODE: 203, TEXT: 'Non-Authoritative Information' },
 		NO_CONTENT:                      { CODE: 204, TEXT: 'No Content' },
 		RESET_CONTENT:                   { CODE: 205, TEXT: 'Reset Content' },
 		PARTIAL_CONTENT:                 { CODE: 206, TEXT: 'Partial Content' },
