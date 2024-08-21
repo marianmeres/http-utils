@@ -159,7 +159,7 @@ export const createHttpApi = (
 		// PUT
 		async put(
 			path: string,
-			data = null,
+			data: any = null,
 			params?: FetchParams,
 			respHeaders: any = null,
 			_dumpParams = false
@@ -175,7 +175,7 @@ export const createHttpApi = (
 		// PATCH
 		async patch(
 			path: string,
-			data = null,
+			data: any = null,
 			params?: FetchParams,
 			respHeaders: any = null,
 			_dumpParams = false
@@ -192,7 +192,7 @@ export const createHttpApi = (
 		// https://stackoverflow.com/questions/299628/is-an-entity-body-allowed-for-an-http-delete-request
 		async del(
 			path: string,
-			data = null,
+			data: any = null,
 			params?: FetchParams,
 			respHeaders: any = null,
 			_dumpParams = false
