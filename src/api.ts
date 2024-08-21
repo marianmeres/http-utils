@@ -129,7 +129,7 @@ export const createHttpApi = (
 		async get(
 			path: string,
 			params?: FetchParams,
-			respHeaders = null,
+			respHeaders: any = null,
 			_dumpParams = false
 		) {
 			path = `${base || ''}${path || ''}`;
@@ -145,7 +145,7 @@ export const createHttpApi = (
 			path: string,
 			data = null,
 			params?: FetchParams,
-			respHeaders = null,
+			respHeaders: any = null,
 			_dumpParams = false
 		) {
 			path = `${base || ''}${path || ''}`;
@@ -161,7 +161,7 @@ export const createHttpApi = (
 			path: string,
 			data = null,
 			params?: FetchParams,
-			respHeaders = null,
+			respHeaders: any = null,
 			_dumpParams = false
 		) {
 			path = `${base || ''}${path || ''}`;
@@ -177,7 +177,7 @@ export const createHttpApi = (
 			path: string,
 			data = null,
 			params?: FetchParams,
-			respHeaders = null,
+			respHeaders: any = null,
 			_dumpParams = false
 		) {
 			path = `${base || ''}${path || ''}`;
@@ -194,7 +194,7 @@ export const createHttpApi = (
 			path: string,
 			data = null,
 			params?: FetchParams,
-			respHeaders = null,
+			respHeaders: any = null,
 			_dumpParams = false
 		) {
 			path = `${base || ''}${path || ''}`;
