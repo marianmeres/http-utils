@@ -1,6 +1,6 @@
 {
 	"name": "@marianmeres/http-utils",
-	"version": "1.6.3",
+	"version": "1.6.4",
 	"description": "Misc DRY http fetch related helpers",
 	"type": "module",
 	"main": "./dist/index.cjs",
