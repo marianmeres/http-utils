@@ -1,4 +1,6 @@
 export class HTTP_STATUS {
+	// special case shortcut
+	static readonly OK = 200;
 	// 1xx
 	// prettier-ignore
 	static readonly INFO = {
