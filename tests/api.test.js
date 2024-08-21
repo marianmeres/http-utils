@@ -24,6 +24,7 @@ const suite = new TestRunner(path.basename(fileURLToPath(import.meta.url)), {
 		server = createServer(async (req, res) => {
 			res.setHeader('Content-Type', 'application/json');
 			res.setHeader('hey', 'ho');
+			res.setHeader('x', req.headers?.x || '');
 			if (req.url === '/echo') {
 				res.statusCode = 200;
 				if (req.method === 'POST') {
@@ -105,9 +106,15 @@ suite.test('createHttpApi POST', async () => {
 	let api = createHttpApi();
 	let respHeaders = {};
 
-	let r = await api.post(`${url}/echo`, { hey: 'ho' }, {}, respHeaders);
+	let r = await api.post(
+		`${url}/echo`,
+		{ hey: 'ho' },
+		{ headers: { x: 'yo' } },
+		respHeaders
+	);
 	assert(r.hey === 'ho');
 	assert(respHeaders.__http_status_code__ === 200);
+	assert(respHeaders.x === 'yo');
 });
 
 suite.test('createHttpApi merge default params', async () => {

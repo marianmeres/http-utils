@@ -12,7 +12,7 @@ interface BaseParams {
 interface FetchParams {
 	data?: any;
 	token?: string | null;
-	headers?: any;
+	headers?: null | Record<string, string>;
 	signal?: any;
 	credentials?: null | 'omit' | 'same-origin' | 'include';
 	raw?: null | boolean;
@@ -30,7 +30,10 @@ const _fetchRaw = async ({
 	signal = null,
 	credentials,
 }: BaseFetchParams) => {
-	headers = Object.entries(headers || {}).map(([k, v]) => ({ [k.toLowerCase()]: v }));
+	headers = Object.entries(headers || {}).reduce(
+		(m, [k, v]) => ({ ...m, [k.toLowerCase()]: v }),
+		{}
+	);
 	const opts: any = { method, credentials, headers, signal };
 
 	if (data) {
