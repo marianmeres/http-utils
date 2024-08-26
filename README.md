@@ -32,7 +32,7 @@ try {
     assert(e.statusText === HTTP_STATUS.ERROR_CLIENT.NOT_FOUND.TEXT);
     // `body` is a custom prop containing the raw http response body text (JSON.parse-d if available)
     assert(e.body.message === 'hey');
-    // `cause` is a standart Error prop, containg here some default debug info
+    // `cause` is a standart Error prop, containing here some default debug info
     assert(err.cause.response.headers)
 }
 

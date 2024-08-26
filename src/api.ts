@@ -94,6 +94,7 @@ const _fetch = async (
 	params.assert ??= true; // default is true
 
 	if (!r.ok && params.assert) {
+		// adding `cause` describing more details
 		throw createHttpError(r.status, null, body, {
 			method: params.method,
 			path: params.path,
