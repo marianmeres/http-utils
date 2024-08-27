@@ -323,12 +323,14 @@ const _fetch = async (params, respHeaders = null, errorMessageExtractor = null, 
         // impossible unless we know what to expect, but we'll do some educated tries...
         const extractor = errorMessageExtractor ?? // provided arg
             createHttpApi.defaultErrorMessageExtractor ?? // static default
-            // educated geuss fallback
+            // educated guess fallback
             function (_body, _response) {
-                let msg = _body?.error?.message ||
+                let msg = 
+                // try opinionated convention first
+                _body?.error?.message ||
                     _body?.message ||
                     _response?.statusText ||
-                    'Unknown response error';
+                    'Unknown error';
                 if (msg.length > 255)
                     msg = `[Shortened]: ${msg.slice(0, 255)}`;
                 return msg;
