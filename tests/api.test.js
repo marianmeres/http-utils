@@ -1,14 +1,18 @@
+import { createClogStr } from '@marianmeres/clog';
 import { TestRunner } from '@marianmeres/test-runner';
 import { strict as assert } from 'node:assert';
 import { createServer } from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { HTTP_ERROR, createHttpApi } from '../dist/index.cjs';
+import { createHttpApi, HTTP_ERROR } from '../dist/index.cjs';
+
+const clog = createClogStr(path.basename(fileURLToPath(import.meta.url)));
 
 let server;
 const hostname = '127.0.0.1';
 const port = 3456;
 const url = `http://${hostname}:${port}`;
+const CUSTOM_ERR_MSG = 'this is custom error';
 
 // https://nodejs.org/en/learn/modules/anatomy-of-an-http-transaction
 const collectBody = async (request) =>
@@ -21,6 +25,7 @@ const collectBody = async (request) =>
 
 const suite = new TestRunner(path.basename(fileURLToPath(import.meta.url)), {
 	beforeEach: async () => {
+		createHttpApi.defaultErrorMessageExtractor = null;
 		server = createServer(async (req, res) => {
 			res.setHeader('Content-Type', 'application/json');
 			res.setHeader('hey', 'ho');
@@ -34,12 +39,15 @@ const suite = new TestRunner(path.basename(fileURLToPath(import.meta.url)), {
 				}
 			} else {
 				res.statusCode = 404;
-				res.end('{"some":{"deep":"message"}}');
+				res.end(`{"error":{"message":"${CUSTOM_ERR_MSG}"}}`);
 			}
 		});
 		return new Promise((resolve) => server.listen(port, hostname, resolve));
 	},
-	afterEach: async () => new Promise((resolve) => server.close(resolve)),
+	afterEach: async () => {
+		createHttpApi.defaultErrorMessageExtractor = null;
+		return new Promise((resolve) => server.close(resolve));
+	},
 });
 
 suite.test('createHttpApi GET', async () => {
@@ -72,17 +80,14 @@ suite.test('createHttpApi RAW', async () => {
 suite.test('createHttpApi error', async () => {
 	let api = createHttpApi();
 
-	let err;
 	try {
 		let r = await api.get(`${url}/asdf`);
 		assert(false); // must not be reached
 	} catch (e) {
-		err = e;
+		assert(e instanceof HTTP_ERROR.NotFound);
+		assert(e.body.error.message === CUSTOM_ERR_MSG);
+		assert(e.cause.response.headers.hey === 'ho');
 	}
-
-	assert(err instanceof HTTP_ERROR.NotFound);
-	assert(err.body.some.deep === 'message');
-	assert(err.cause.response.headers.hey === 'ho');
 });
 
 suite.test('createHttpApi error { raw: true }', async () => {
@@ -98,8 +103,59 @@ suite.test('createHttpApi error { assert: false } does not throw', async () => {
 	let respHeaders = {};
 
 	let r = await api.get(`${url}/asdf`, { assert: false }, respHeaders);
-	assert(r.some.deep === 'message');
+	assert(r.error.message === CUSTOM_ERR_MSG);
 	assert(respHeaders.__http_status_code__ === 404);
+});
+
+suite.test('custom local error message extractor', async () => {
+	let api = createHttpApi();
+
+	let err;
+	try {
+		let r = await api.get(`${url}/asdf`, null, null, (body, resp) => {
+			return body.error.message.toUpperCase();
+		});
+		assert(false); // must not be reached
+	} catch (e) {
+		assert(e instanceof HTTP_ERROR.NotFound);
+		assert(e.message === CUSTOM_ERR_MSG.toUpperCase());
+		assert(e.body.error.message === CUSTOM_ERR_MSG);
+		assert(e.cause.response.headers.hey === 'ho');
+	}
+});
+
+suite.test('custom factory error message extractor', async () => {
+	let api = createHttpApi(null, null, (body, resp) => {
+		return body.error.message.toUpperCase();
+	});
+
+	try {
+		let r = await api.get(`${url}/asdf`);
+		assert(false); // must not be reached
+	} catch (e) {
+		assert(e instanceof HTTP_ERROR.NotFound);
+		assert(e.message === CUSTOM_ERR_MSG.toUpperCase());
+		assert(e.body.error.message === CUSTOM_ERR_MSG);
+		assert(e.cause.response.headers.hey === 'ho');
+	}
+});
+
+suite.test('custom global error message extractor', async () => {
+	createHttpApi.defaultErrorMessageExtractor = (body, resp) => {
+		return body.error.message.toUpperCase();
+	};
+
+	let api = createHttpApi();
+
+	try {
+		let r = await api.get(`${url}/asdf`);
+		assert(false); // must not be reached
+	} catch (e) {
+		assert(e instanceof HTTP_ERROR.NotFound);
+		assert(e.message === CUSTOM_ERR_MSG.toUpperCase());
+		assert(e.body.error.message === CUSTOM_ERR_MSG);
+		assert(e.cause.response.headers.hey === 'ho');
+	}
 });
 
 suite.test('createHttpApi POST', async () => {
@@ -129,6 +185,7 @@ suite.test('createHttpApi merge default params', async () => {
 		'/hoho',
 		{ foo: 'bar' },
 		{ headers: { hey: 'ho' } },
+		null,
 		null,
 		true
 	);

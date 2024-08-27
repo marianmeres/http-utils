@@ -2,7 +2,7 @@ import { dset } from 'dset/merge';
 import { createHttpError } from './error.js';
 
 // this is all very opinionated and may not be useful for every use case...
-// there is no magic added over plain fetch calls, just more opinionated and dry api
+// there is no magic added over plain fetch calls, just more convenient api
 
 interface BaseParams {
 	method: 'GET' | 'POST' | 'PATCH' | 'DELETE' | 'PUT';
@@ -20,6 +20,8 @@ interface FetchParams {
 }
 
 type BaseFetchParams = BaseParams & FetchParams; // Exclude<Drinks, Soda> |
+
+type ErrorMessageExtractor = (body: any, response: Response) => any;
 
 const _fetchRaw = async ({
 	method,
@@ -64,6 +66,7 @@ const _fetchRaw = async ({
 const _fetch = async (
 	params: BaseFetchParams,
 	respHeaders = null,
+	errorMessageExtractor: ErrorMessageExtractor | null | undefined = null,
 	_dumpParams = false
 ) => {
 	if (_dumpParams) return params;
@@ -94,8 +97,27 @@ const _fetch = async (
 	params.assert ??= true; // default is true
 
 	if (!r.ok && params.assert) {
+		// now we need to extract error message from an unknown response... this is obviously
+		// impossible unless we know what to expect, but we'll do some educated tries...
+		const extractor =
+			errorMessageExtractor ?? // provided arg
+			createHttpApi.defaultErrorMessageExtractor ?? // static default
+			// educated guess fallback
+			function (_body: any, _response: Response) {
+				let msg =
+					// try opinionated convention first
+					_body?.error?.message ||
+					_body?.message ||
+					_response?.statusText ||
+					'Unknown error';
+
+				if (msg.length > 255) msg = `[Shortened]: ${msg.slice(0, 255)}`;
+
+				return msg;
+			};
+
 		// adding `cause` describing more details
-		throw createHttpError(r.status, null, body, {
+		throw createHttpError(r.status, extractor(body, r), body, {
 			method: params.method,
 			path: params.path,
 			response: {
@@ -109,10 +131,11 @@ const _fetch = async (
 	return body;
 };
 
-export const createHttpApi = (
+export function createHttpApi(
 	base?: string | null,
-	defaults?: Partial<BaseFetchParams> | (() => Promise<Partial<BaseFetchParams>>)
-) => {
+	defaults?: Partial<BaseFetchParams> | (() => Promise<Partial<BaseFetchParams>>),
+	factoryErrorMessageExtractor?: ErrorMessageExtractor | null | undefined
+) {
 	const _merge = (a: any, b: any): any => {
 		const wrap = { result: a };
 		dset(wrap, 'result', b);
@@ -134,12 +157,14 @@ export const createHttpApi = (
 			path: string,
 			params?: FetchParams,
 			respHeaders: any = null,
+			errorMessageExtractor: ErrorMessageExtractor | null | undefined = null,
 			_dumpParams = false
 		) {
 			path = `${base || ''}${path || ''}`;
 			return _fetch(
 				_merge(await _getDefs(), { ...params, method: 'GET', path }),
 				respHeaders,
+				errorMessageExtractor ?? factoryErrorMessageExtractor,
 				_dumpParams
 			);
 		},
@@ -150,12 +175,14 @@ export const createHttpApi = (
 			data: any = null,
 			params?: FetchParams,
 			respHeaders: any = null,
+			errorMessageExtractor: ErrorMessageExtractor | null | undefined = null,
 			_dumpParams = false
 		) {
 			path = `${base || ''}${path || ''}`;
 			return _fetch(
 				_merge(await _getDefs(), { ...(params || {}), data, method: 'POST', path }),
 				respHeaders,
+				errorMessageExtractor ?? factoryErrorMessageExtractor,
 				_dumpParams
 			);
 		},
@@ -166,12 +193,14 @@ export const createHttpApi = (
 			data: any = null,
 			params?: FetchParams,
 			respHeaders: any = null,
+			errorMessageExtractor: ErrorMessageExtractor | null | undefined = null,
 			_dumpParams = false
 		) {
 			path = `${base || ''}${path || ''}`;
 			return _fetch(
 				_merge(await _getDefs(), { ...(params || {}), data, method: 'PUT', path }),
 				respHeaders,
+				errorMessageExtractor ?? factoryErrorMessageExtractor,
 				_dumpParams
 			);
 		},
@@ -182,12 +211,14 @@ export const createHttpApi = (
 			data: any = null,
 			params?: FetchParams,
 			respHeaders: any = null,
+			errorMessageExtractor: ErrorMessageExtractor | null | undefined = null,
 			_dumpParams = false
 		) {
 			path = `${base || ''}${path || ''}`;
 			return _fetch(
 				_merge(await _getDefs(), { ...(params || {}), data, method: 'PATCH', path }),
 				respHeaders,
+				errorMessageExtractor ?? factoryErrorMessageExtractor,
 				_dumpParams
 			);
 		},
@@ -199,14 +230,21 @@ export const createHttpApi = (
 			data: any = null,
 			params?: FetchParams,
 			respHeaders: any = null,
+			errorMessageExtractor: ErrorMessageExtractor | null | undefined = null,
 			_dumpParams = false
 		) {
 			path = `${base || ''}${path || ''}`;
 			return _fetch(
 				_merge(await _getDefs(), { ...(params || {}), data, method: 'DELETE', path }),
 				respHeaders,
+				errorMessageExtractor ?? factoryErrorMessageExtractor,
 				_dumpParams
 			);
 		},
 	};
-};
+}
+
+createHttpApi.defaultErrorMessageExtractor = null as
+	| ErrorMessageExtractor
+	| null
+	| undefined;
