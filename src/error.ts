@@ -61,6 +61,12 @@ class Gone extends HttpError {
 	public statusText = HTTP_STATUS.ERROR_CLIENT.GONE.TEXT;
 }
 
+class UnprocessableContent extends HttpError {
+	public name = 'HttpUnprocessableContentError';
+	public status = HTTP_STATUS.ERROR_CLIENT.UNPROCESSABLE_CONTENT.CODE;
+	public statusText = HTTP_STATUS.ERROR_CLIENT.UNPROCESSABLE_CONTENT.TEXT;
+}
+
 class ImATeapot extends HttpError {
 	public name = 'HttpImATeapotError';
 	public status = HTTP_STATUS.ERROR_CLIENT.IM_A_TEAPOT.CODE;
@@ -105,6 +111,7 @@ export const HTTP_ERROR = {
 	Conflict,
 	Gone,
 	ImATeapot,
+	UnprocessableContent,
 	// server
 	InternalServerError,
 	NotImplemented,
@@ -122,6 +129,7 @@ const _wellKnownCtorMap = {
 	'409': Conflict,
 	'410': Gone,
 	'418': ImATeapot,
+	'422': UnprocessableContent,
 	//
 	'500': InternalServerError,
 	'501': NotImplemented,

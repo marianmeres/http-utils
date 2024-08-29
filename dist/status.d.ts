@@ -270,6 +270,7 @@ export declare class HTTP_STATUS {
     static readonly METHOD_NOT_ALLOWED: number;
     static readonly CONFLICT: number;
     static readonly GONE: number;
+    static readonly UNPROCESSABLE_CONTENT: number;
     static readonly INTERNAL_SERVER_ERROR: number;
     static readonly NOT_IMPLEMENTED: number;
     static readonly SERVICE_UNAVAILABLE: number;

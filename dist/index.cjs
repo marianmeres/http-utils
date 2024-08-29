@@ -103,6 +103,7 @@ class HTTP_STATUS {
     static METHOD_NOT_ALLOWED = HTTP_STATUS.ERROR_CLIENT.METHOD_NOT_ALLOWED.CODE;
     static CONFLICT = HTTP_STATUS.ERROR_CLIENT.CONFLICT.CODE;
     static GONE = HTTP_STATUS.ERROR_CLIENT.GONE.CODE;
+    static UNPROCESSABLE_CONTENT = HTTP_STATUS.ERROR_CLIENT.UNPROCESSABLE_CONTENT.CODE;
     // 5xx
     static INTERNAL_SERVER_ERROR = HTTP_STATUS.ERROR_SERVER.INTERNAL_SERVER_ERROR.CODE;
     static NOT_IMPLEMENTED = HTTP_STATUS.ERROR_SERVER.NOT_IMPLEMENTED.CODE;
@@ -173,6 +174,11 @@ class Gone extends HttpError {
     status = HTTP_STATUS.ERROR_CLIENT.GONE.CODE;
     statusText = HTTP_STATUS.ERROR_CLIENT.GONE.TEXT;
 }
+class UnprocessableContent extends HttpError {
+    name = 'HttpUnprocessableContentError';
+    status = HTTP_STATUS.ERROR_CLIENT.UNPROCESSABLE_CONTENT.CODE;
+    statusText = HTTP_STATUS.ERROR_CLIENT.UNPROCESSABLE_CONTENT.TEXT;
+}
 class ImATeapot extends HttpError {
     name = 'HttpImATeapotError';
     status = HTTP_STATUS.ERROR_CLIENT.IM_A_TEAPOT.CODE;
@@ -211,6 +217,7 @@ const HTTP_ERROR = {
     Conflict,
     Gone,
     ImATeapot,
+    UnprocessableContent,
     // server
     InternalServerError,
     NotImplemented,
@@ -227,6 +234,7 @@ const _wellKnownCtorMap = {
     '409': Conflict,
     '410': Gone,
     '418': ImATeapot,
+    '422': UnprocessableContent,
     //
     '500': InternalServerError,
     '501': NotImplemented,
