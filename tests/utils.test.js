@@ -1,9 +1,16 @@
+import { createClogStr } from '@marianmeres/clog';
 import { TestRunner } from '@marianmeres/test-runner';
 import { strict as assert } from 'node:assert';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { HTTP_ERROR, HTTP_STATUS, createHttpError } from '../dist/index.cjs';
+import {
+	HTTP_ERROR,
+	HTTP_STATUS,
+	createHttpError,
+	getErrorMessage,
+} from '../dist/index.cjs';
 
+const clog = createClogStr(path.basename(fileURLToPath(import.meta.url)));
 const suite = new TestRunner(path.basename(fileURLToPath(import.meta.url)));
 
 suite.test('HTTP_STATUS.findByCode', () => {
@@ -59,6 +66,37 @@ suite.test('createHttpErrorByCode', () => {
 	e = createHttpError(123, 'Hey', '123');
 	assert(e.toString() === 'HttpInternalServerError: Hey');
 	assert(e.body === 123);
+});
+
+suite.test('getErrorMessage', () => {
+	let e = new TypeError('Foo');
+	assert(getErrorMessage(e) === 'Foo');
+	assert(getErrorMessage(e, false) === 'Foo');
+	assert(getErrorMessage(e.toString()) === 'Foo');
+	assert(getErrorMessage(e.toString(), false) === 'TypeError: Foo');
+
+	assert(getErrorMessage({ toString: () => 'custom' }) === 'custom');
+	assert(getErrorMessage({ toString: () => '' }) === 'Unknown Error');
+	assert(getErrorMessage(null) === '');
+
+	e = createHttpError(123, 'Hey', '123');
+	assert(getErrorMessage(e) === 'Hey');
+
+	// body.error.message has priority over message
+	e = createHttpError(123, 'Hey', { error: { message: 'Ho' } });
+	assert(getErrorMessage(e) === 'Ho');
+
+	// body.message has priority over message
+	e = createHttpError(123, 'Hey', { message: 'Ha' });
+	assert(getErrorMessage(e) === 'Ha');
+
+	// cause.code has priority over cause.message
+	e = createHttpError(123, 'Hey', { message: 'Ha' }, { code: 'YO', message: 'Ignored' });
+	assert(getErrorMessage(e) === 'YO');
+
+	// cause.message has priority over body.message
+	e = createHttpError(123, 'Hey', { message: 'Ha' }, { message: 'Boom' });
+	assert(getErrorMessage(e) === 'Boom');
 });
 
 export default suite;

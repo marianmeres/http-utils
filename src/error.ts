@@ -137,6 +137,15 @@ const _wellKnownCtorMap = {
 	'503': ServiceUnavailable,
 };
 
+const _maybeJsonParse = (v: any) => {
+	if (typeof v === 'string') {
+		try {
+			v = JSON.parse(v);
+		} catch (e) {}
+	}
+	return v;
+};
+
 export const createHttpError = (
 	code: number | string,
 	message?: string | null,
@@ -153,16 +162,10 @@ export const createHttpError = (
 	if (isNaN(code) || !(code >= 400 && code < 600)) code = fallback.CODE;
 
 	// opinionated convention
-	if (typeof body === 'string') {
-		// prettier-ignore
-		try { body = JSON.parse(body); } catch (e) {}
-	}
+	body = _maybeJsonParse(body);
 
 	// opinionated convention
-	if (typeof cause === 'string') {
-		// prettier-ignore
-		try { cause = JSON.parse(cause); } catch (e) {}
-	}
+	cause = _maybeJsonParse(cause);
 
 	// try to find the well known one, otherwise fallback to generic
 	const ctor =
@@ -179,4 +182,43 @@ export const createHttpError = (
 	e.body = body;
 
 	return e;
+};
+
+export const getErrorMessage = (e: any, stripErrorPrefix = true): string => {
+	if (!e) return '';
+
+	// PROBLEM is that error may bubble from various sources which are not always under control
+	// and even if they were it still may not be trivial to keep similar structure on each error boundary...
+	// So, we'll just do what we can, it will not be perfect, but should handle most cases most of the time.
+
+	// Also, I'm relying on some of my own opinionated conventions as well...
+	const cause = _maybeJsonParse(e?.cause);
+	const body = _maybeJsonParse(e?.body);
+
+	let msg =
+		// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/cause
+		// e.cause is the standard prop for error details, so should be considered as
+		// the most authoritative (if available)
+		// "code" and "message" are my own conventions
+		cause?.code ||
+		cause?.message ||
+		(typeof cause === 'string' ? cause : null) ||
+		// non-standard "body" is this package's HttpError prop
+		body?.error?.message ||
+		body?.message ||
+		(typeof body === 'string' ? body : null) ||
+		// the common message from Error ctor (e.g. "Foo" if new TypeError("Foo"))
+		e?.message ||
+		// the Error class name (e.g. TypeError)
+		e?.name ||
+		// this should handle (almost) everything else (mainly if e is not the Error instance)
+		e?.toString() ||
+		// very last fallback if `toString()` was not available (or returned empty)
+		'Unknown Error';
+
+	if (stripErrorPrefix) {
+		msg = msg.replace(/^[^:]*Error: /, '');
+	}
+
+	return msg;
 };

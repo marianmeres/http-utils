@@ -90,4 +90,5 @@ export declare const HTTP_ERROR: {
     ServiceUnavailable: typeof ServiceUnavailable;
 };
 export declare const createHttpError: (code: number | string, message?: string | null, body?: string | null, cause?: any) => BadRequest | Unauthorized | Forbidden | NotFound | MethodNotAllowed | RequestTimeout | Conflict | Gone | UnprocessableContent | ImATeapot | InternalServerError | NotImplemented | BadGateway | ServiceUnavailable;
+export declare const getErrorMessage: (e: any, stripErrorPrefix?: boolean) => string;
 export {};
