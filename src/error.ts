@@ -161,10 +161,8 @@ export const createHttpError = (
 	code = Number(code);
 	if (isNaN(code) || !(code >= 400 && code < 600)) code = fallback.CODE;
 
-	// opinionated convention
+	// opinionated conventions
 	body = _maybeJsonParse(body);
-
-	// opinionated convention
 	cause = _maybeJsonParse(cause);
 
 	// try to find the well known one, otherwise fallback to generic
@@ -211,7 +209,7 @@ export const getErrorMessage = (e: any, stripErrorPrefix = true): string => {
 		e?.message ||
 		// the Error class name (e.g. TypeError)
 		e?.name ||
-		// this should handle (almost) everything else (mainly if e is not the Error instance)
+		// this should handle (almost) everything else (mainly if e is not an Error instance)
 		e?.toString() ||
 		// very last fallback if `toString()` was not available (or returned empty)
 		'Unknown Error';
