@@ -90,8 +90,8 @@ suite.test('getErrorMessage', () => {
 	e = createHttpError(123, 'Hey', { message: 'Ha' });
 	assert(getErrorMessage(e) === 'Ha');
 
-	// cause.code has priority over cause.message
-	e = createHttpError(123, 'Hey', { message: 'Ha' }, { code: 'YO', message: 'Ignored' });
+	// cause.message has priority over cause.code
+	e = createHttpError(123, 'Hey', { message: 'Ha' }, { message: 'YO', code: 'Ignored' });
 	assert(getErrorMessage(e) === 'YO');
 
 	// cause.message has priority over body.message

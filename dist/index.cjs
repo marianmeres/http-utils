@@ -290,8 +290,8 @@ const getErrorMessage = (e, stripErrorPrefix = true) => {
     // e.cause is the standard prop for error details, so should be considered as
     // the most authoritative (if available)
     // "code" and "message" are my own conventions
-    cause?.code ||
-        cause?.message ||
+    cause?.message ||
+        cause?.code ||
         (typeof cause === 'string' ? cause : null) ||
         // non-standard "body" is this package's HttpError prop
         body?.error?.message ||
@@ -305,7 +305,7 @@ const getErrorMessage = (e, stripErrorPrefix = true) => {
         e?.toString() ||
         // very last fallback if `toString()` was not available (or returned empty)
         'Unknown Error';
-    // cast to string
+    // ensure we're sending string
     msg = `${msg}`;
     if (stripErrorPrefix) {
         msg = msg.replace(/^[^:]*Error: /, '');
