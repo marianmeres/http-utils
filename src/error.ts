@@ -155,7 +155,7 @@ export const createHttpError = (
 	// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/cause
 	// arbitrary details, typically response text (will be JSON.parse-d if the content is a valid json string)
 	cause?: any
-) => {
+): HttpError => {
 	const fallback = HTTP_STATUS.ERROR_SERVER.INTERNAL_SERVER_ERROR;
 
 	code = Number(code);
@@ -213,6 +213,9 @@ export const getErrorMessage = (e: any, stripErrorPrefix = true): string => {
 		e?.toString() ||
 		// very last fallback if `toString()` was not available (or returned empty)
 		'Unknown Error';
+
+	// cast to string
+	msg = `${msg}`;
 
 	if (stripErrorPrefix) {
 		msg = msg.replace(/^[^:]*Error: /, '');
