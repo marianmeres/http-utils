@@ -204,6 +204,7 @@ export const getErrorMessage = (e: any, stripErrorPrefix = true): string => {
 		// non-standard "body" is this package's HttpError prop
 		body?.error?.message ||
 		body?.message ||
+		body?.error ||
 		(typeof body === 'string' ? body : null) ||
 		// the common message from Error ctor (e.g. "Foo" if new TypeError("Foo"))
 		e?.message ||
