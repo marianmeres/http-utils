@@ -370,6 +370,7 @@ const _fetch = async (params, respHeaders = null, errorMessageExtractor = null, 
                 // try opinionated convention first
                 _body?.error?.message ||
                     _body?.message ||
+                    _body?.error ||
                     _response?.statusText ||
                     'Unknown error';
                 if (msg.length > 255)
