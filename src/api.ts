@@ -108,6 +108,7 @@ const _fetch = async (
 					// try opinionated convention first
 					_body?.error?.message ||
 					_body?.message ||
+					_body?.error ||
 					_response?.statusText ||
 					'Unknown error';
 
