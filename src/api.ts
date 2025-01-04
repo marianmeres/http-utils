@@ -152,6 +152,12 @@ export function createHttpApi(
 			}
 		});
 
+	const _buildPath = (path: string, base?: string | null) => {
+		base = `${base || ''}`;
+		path = `${path || ''}`;
+		return /^https?:/.test(path) ? path : base + path;
+	};
+
 	return {
 		// GET
 		async get(
@@ -161,7 +167,7 @@ export function createHttpApi(
 			errorMessageExtractor: ErrorMessageExtractor | null | undefined = null,
 			_dumpParams = false
 		) {
-			path = `${base || ''}${path || ''}`;
+			path = _buildPath(path, base);
 			return _fetch(
 				_merge(await _getDefs(), { ...params, method: 'GET', path }),
 				respHeaders,
@@ -179,7 +185,7 @@ export function createHttpApi(
 			errorMessageExtractor: ErrorMessageExtractor | null | undefined = null,
 			_dumpParams = false
 		) {
-			path = `${base || ''}${path || ''}`;
+			path = _buildPath(path, base);
 			return _fetch(
 				_merge(await _getDefs(), { ...(params || {}), data, method: 'POST', path }),
 				respHeaders,
@@ -197,7 +203,7 @@ export function createHttpApi(
 			errorMessageExtractor: ErrorMessageExtractor | null | undefined = null,
 			_dumpParams = false
 		) {
-			path = `${base || ''}${path || ''}`;
+			path = _buildPath(path, base);
 			return _fetch(
 				_merge(await _getDefs(), { ...(params || {}), data, method: 'PUT', path }),
 				respHeaders,
@@ -215,7 +221,7 @@ export function createHttpApi(
 			errorMessageExtractor: ErrorMessageExtractor | null | undefined = null,
 			_dumpParams = false
 		) {
-			path = `${base || ''}${path || ''}`;
+			path = _buildPath(path, base);
 			return _fetch(
 				_merge(await _getDefs(), { ...(params || {}), data, method: 'PATCH', path }),
 				respHeaders,
@@ -234,7 +240,7 @@ export function createHttpApi(
 			errorMessageExtractor: ErrorMessageExtractor | null | undefined = null,
 			_dumpParams = false
 		) {
-			path = `${base || ''}${path || ''}`;
+			path = _buildPath(path, base);
 			return _fetch(
 				_merge(await _getDefs(), { ...(params || {}), data, method: 'DELETE', path }),
 				respHeaders,
@@ -242,6 +248,10 @@ export function createHttpApi(
 				_dumpParams
 			);
 		},
+
+		// helper method to return api's resolved url
+		// note: cannot use URL(...) as relative would be invalid
+		url: (path: string) => _buildPath(path, base),
 	};
 }
 

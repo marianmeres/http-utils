@@ -199,4 +199,12 @@ suite.test('createHttpApi merge default params', async () => {
 	assert(params.data.foo === 'bar');
 });
 
+suite.test('url build', async () => {
+	assert(createHttpApi().url('/foo') === '/foo');
+	assert(createHttpApi('http://example').url('/foo') === 'http://example/foo');
+	assert(
+		createHttpApi('http://ignored').url('http://another/foo') === 'http://another/foo'
+	);
+});
+
 export default suite;

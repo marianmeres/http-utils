@@ -309,7 +309,7 @@ const getErrorMessage = (e, stripErrorPrefix = true) => {
     // ensure we're sending string
     msg = `${msg}`;
     if (stripErrorPrefix) {
-        msg = msg.replace(/^[^:]*Error: /, '');
+        msg = msg.replace(/^[^:]*Error: /i, '');
     }
     return msg;
 };
@@ -404,33 +404,41 @@ function createHttpApi(base, defaults, factoryErrorMessageExtractor) {
             resolve({ ...(defaults || {}) });
         }
     });
+    const _buildPath = (path, base) => {
+        base = `${base || ''}`;
+        path = `${path || ''}`;
+        return /^https?:/.test(path) ? path : base + path;
+    };
     return {
         // GET
         async get(path, params, respHeaders = null, errorMessageExtractor = null, _dumpParams = false) {
-            path = `${base || ''}${path || ''}`;
+            path = _buildPath(path, base);
             return _fetch(_merge(await _getDefs(), { ...params, method: 'GET', path }), respHeaders, errorMessageExtractor ?? factoryErrorMessageExtractor, _dumpParams);
         },
         // POST
         async post(path, data = null, params, respHeaders = null, errorMessageExtractor = null, _dumpParams = false) {
-            path = `${base || ''}${path || ''}`;
+            path = _buildPath(path, base);
             return _fetch(_merge(await _getDefs(), { ...(params || {}), data, method: 'POST', path }), respHeaders, errorMessageExtractor ?? factoryErrorMessageExtractor, _dumpParams);
         },
         // PUT
         async put(path, data = null, params, respHeaders = null, errorMessageExtractor = null, _dumpParams = false) {
-            path = `${base || ''}${path || ''}`;
+            path = _buildPath(path, base);
             return _fetch(_merge(await _getDefs(), { ...(params || {}), data, method: 'PUT', path }), respHeaders, errorMessageExtractor ?? factoryErrorMessageExtractor, _dumpParams);
         },
         // PATCH
         async patch(path, data = null, params, respHeaders = null, errorMessageExtractor = null, _dumpParams = false) {
-            path = `${base || ''}${path || ''}`;
+            path = _buildPath(path, base);
             return _fetch(_merge(await _getDefs(), { ...(params || {}), data, method: 'PATCH', path }), respHeaders, errorMessageExtractor ?? factoryErrorMessageExtractor, _dumpParams);
         },
         // DELETE
         // https://stackoverflow.com/questions/299628/is-an-entity-body-allowed-for-an-http-delete-request
         async del(path, data = null, params, respHeaders = null, errorMessageExtractor = null, _dumpParams = false) {
-            path = `${base || ''}${path || ''}`;
+            path = _buildPath(path, base);
             return _fetch(_merge(await _getDefs(), { ...(params || {}), data, method: 'DELETE', path }), respHeaders, errorMessageExtractor ?? factoryErrorMessageExtractor, _dumpParams);
         },
+        // helper method to return api's resolved url
+        // note: cannot use URL(...) as relative would be invalid
+        url: (path) => _buildPath(path, base),
     };
 }
 createHttpApi.defaultErrorMessageExtractor = null;

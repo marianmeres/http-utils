@@ -219,7 +219,7 @@ export const getErrorMessage = (e: any, stripErrorPrefix = true): string => {
 	msg = `${msg}`;
 
 	if (stripErrorPrefix) {
-		msg = msg.replace(/^[^:]*Error: /, '');
+		msg = msg.replace(/^[^:]*Error: /i, '');
 	}
 
 	return msg;
