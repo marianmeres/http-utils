@@ -179,6 +179,11 @@ class UnprocessableContent extends HttpError {
     status = HTTP_STATUS.ERROR_CLIENT.UNPROCESSABLE_CONTENT.CODE;
     statusText = HTTP_STATUS.ERROR_CLIENT.UNPROCESSABLE_CONTENT.TEXT;
 }
+class TooManyRequests extends HttpError {
+    name = 'HttpTooManyRequestsError';
+    status = HTTP_STATUS.ERROR_CLIENT.TOO_MANY_REQUESTS.CODE;
+    statusText = HTTP_STATUS.ERROR_CLIENT.TOO_MANY_REQUESTS.TEXT;
+}
 class ImATeapot extends HttpError {
     name = 'HttpImATeapotError';
     status = HTTP_STATUS.ERROR_CLIENT.IM_A_TEAPOT.CODE;
@@ -218,6 +223,7 @@ const HTTP_ERROR = {
     Gone,
     ImATeapot,
     UnprocessableContent,
+    TooManyRequests,
     // server
     InternalServerError,
     NotImplemented,
@@ -235,6 +241,7 @@ const _wellKnownCtorMap = {
     '410': Gone,
     '418': ImATeapot,
     '422': UnprocessableContent,
+    '429': TooManyRequests,
     //
     '500': InternalServerError,
     '501': NotImplemented,

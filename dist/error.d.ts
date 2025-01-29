@@ -49,6 +49,11 @@ declare class UnprocessableContent extends HttpError {
     status: number;
     statusText: string;
 }
+declare class TooManyRequests extends HttpError {
+    name: string;
+    status: number;
+    statusText: string;
+}
 declare class ImATeapot extends HttpError {
     name: string;
     status: number;
@@ -84,6 +89,7 @@ export declare const HTTP_ERROR: {
     Gone: typeof Gone;
     ImATeapot: typeof ImATeapot;
     UnprocessableContent: typeof UnprocessableContent;
+    TooManyRequests: typeof TooManyRequests;
     InternalServerError: typeof InternalServerError;
     NotImplemented: typeof NotImplemented;
     BadGateway: typeof BadGateway;
