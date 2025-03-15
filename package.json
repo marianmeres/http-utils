@@ -18,7 +18,8 @@
 		"release": "release -v minor",
 		"release:patch": "release -v patch",
 		"test": "test-runner",
-		"build": "npm run clean && rollup -c"
+		"build": "npm run clean && rollup -c",
+		"build:watch": "npm run clean && rollup -w -c"
 	},
 	"types": "./dist/index.d.ts",
 	"repository": {
