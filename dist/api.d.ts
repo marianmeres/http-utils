@@ -20,6 +20,7 @@ export declare function createHttpApi(base?: string | null, defaults?: Partial<B
     patch(path: string, data?: any, params?: FetchParams, respHeaders?: any, errorMessageExtractor?: ErrorMessageExtractor | null | undefined, _dumpParams?: boolean): Promise<any>;
     del(path: string, data?: any, params?: FetchParams, respHeaders?: any, errorMessageExtractor?: ErrorMessageExtractor | null | undefined, _dumpParams?: boolean): Promise<any>;
     url: (path: string) => string;
+    base: string | null | undefined;
 };
 export declare namespace createHttpApi {
     var defaultErrorMessageExtractor: ErrorMessageExtractor | null | undefined;

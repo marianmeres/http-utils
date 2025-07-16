@@ -66,6 +66,8 @@ suite.test('createHttpApi base option', async () => {
 	let r = await api.get(`/echo`, {}, respHeaders);
 	assert(r.foo === 'bar');
 	assert(respHeaders.__http_status_code__ === 200);
+
+	assert(api.base === url);
 });
 
 suite.test('createHttpApi RAW', async () => {
@@ -75,6 +77,13 @@ suite.test('createHttpApi RAW', async () => {
 	// raw
 	let r = await api.get(`${url}/echo`, { raw: true });
 	assert(r instanceof Response);
+
+	// off-topic
+	assert(api.base === undefined);
+	assert(api.url('/foo') === '/foo');
+	api.base = url;
+	assert(api.base === url);
+	assert(api.url('/foo') === url + '/foo');
 });
 
 suite.test('createHttpApi error', async () => {

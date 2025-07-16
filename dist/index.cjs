@@ -447,6 +447,13 @@ function createHttpApi(base, defaults, factoryErrorMessageExtractor) {
         // helper method to return api's resolved url
         // note: cannot use URL(...) as relative would be invalid
         url: (path) => _buildPath(path, base),
+        //
+        get base() {
+            return base;
+        },
+        set base(v) {
+            base = v;
+        },
     };
 }
 createHttpApi.defaultErrorMessageExtractor = null;

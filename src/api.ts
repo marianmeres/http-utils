@@ -252,6 +252,15 @@ export function createHttpApi(
 		// helper method to return api's resolved url
 		// note: cannot use URL(...) as relative would be invalid
 		url: (path: string) => _buildPath(path, base),
+
+		//
+		get base(): string | null | undefined {
+			return base;
+		},
+
+		set base(v: string | null | undefined) {
+			base = v;
+		},
 	};
 }
 
