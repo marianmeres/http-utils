@@ -44,6 +44,11 @@ declare class Gone extends HttpError {
     status: number;
     statusText: string;
 }
+declare class LengthRequired extends HttpError {
+    name: string;
+    status: number;
+    statusText: string;
+}
 declare class UnprocessableContent extends HttpError {
     name: string;
     status: number;
@@ -87,6 +92,7 @@ export declare const HTTP_ERROR: {
     RequestTimeout: typeof RequestTimeout;
     Conflict: typeof Conflict;
     Gone: typeof Gone;
+    LengthRequired: typeof LengthRequired;
     ImATeapot: typeof ImATeapot;
     UnprocessableContent: typeof UnprocessableContent;
     TooManyRequests: typeof TooManyRequests;

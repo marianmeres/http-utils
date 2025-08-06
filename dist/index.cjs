@@ -175,6 +175,11 @@ class Gone extends HttpError {
     status = HTTP_STATUS.ERROR_CLIENT.GONE.CODE;
     statusText = HTTP_STATUS.ERROR_CLIENT.GONE.TEXT;
 }
+class LengthRequired extends HttpError {
+    name = 'HttpLengthRequiredError';
+    status = HTTP_STATUS.ERROR_CLIENT.LENGTH_REQUIRED.CODE;
+    statusText = HTTP_STATUS.ERROR_CLIENT.LENGTH_REQUIRED.TEXT;
+}
 class UnprocessableContent extends HttpError {
     name = 'HttpUnprocessableContentError';
     status = HTTP_STATUS.ERROR_CLIENT.UNPROCESSABLE_CONTENT.CODE;
@@ -222,6 +227,7 @@ const HTTP_ERROR = {
     RequestTimeout,
     Conflict,
     Gone,
+    LengthRequired,
     ImATeapot,
     UnprocessableContent,
     TooManyRequests,
@@ -240,6 +246,7 @@ const _wellKnownCtorMap = {
     '408': RequestTimeout,
     '409': Conflict,
     '410': Gone,
+    '411': LengthRequired,
     '418': ImATeapot,
     '422': UnprocessableContent,
     '429': TooManyRequests,
