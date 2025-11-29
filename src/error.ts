@@ -1,11 +1,15 @@
-import { HTTP_STATUS } from './status.js';
+import { HTTP_STATUS } from './status.ts';
 
-// opinionated base for all
+/**
+ * Base HTTP error class. Extends Error with HTTP-specific properties.
+ */
 class HttpError extends Error {
-	public name = 'HttpError';
-	// props simulating fetch Response
+	public override name = 'HttpError';
+	/** HTTP status code (e.g., 404, 500) */
 	public status: number = HTTP_STATUS.ERROR_SERVER.INTERNAL_SERVER_ERROR.CODE;
+	/** HTTP status text (e.g., "Not Found", "Internal Server Error") */
 	public statusText: string = HTTP_STATUS.ERROR_SERVER.INTERNAL_SERVER_ERROR.TEXT;
+	/** Response body (auto-parsed as JSON if possible) */
 	public body: any = null;
 }
 
@@ -14,102 +18,125 @@ class HttpError extends Error {
 // client
 
 class BadRequest extends HttpError {
-	public name = 'HttpBadRequestError';
-	public status = HTTP_STATUS.ERROR_CLIENT.BAD_REQUEST.CODE;
-	public statusText = HTTP_STATUS.ERROR_CLIENT.BAD_REQUEST.TEXT;
+	public override name = 'HttpBadRequestError';
+	public override status = HTTP_STATUS.ERROR_CLIENT.BAD_REQUEST.CODE;
+	public override statusText = HTTP_STATUS.ERROR_CLIENT.BAD_REQUEST.TEXT;
 }
 
 class Unauthorized extends HttpError {
-	public name = 'HttpUnauthorizedError';
-	public status = HTTP_STATUS.ERROR_CLIENT.UNAUTHORIZED.CODE;
-	public statusText = HTTP_STATUS.ERROR_CLIENT.UNAUTHORIZED.TEXT;
+	public override name = 'HttpUnauthorizedError';
+	public override status = HTTP_STATUS.ERROR_CLIENT.UNAUTHORIZED.CODE;
+	public override statusText = HTTP_STATUS.ERROR_CLIENT.UNAUTHORIZED.TEXT;
 }
 
 class Forbidden extends HttpError {
-	public name = 'HttpForbiddenError';
-	public status = HTTP_STATUS.ERROR_CLIENT.FORBIDDEN.CODE;
-	public statusText = HTTP_STATUS.ERROR_CLIENT.FORBIDDEN.TEXT;
+	public override name = 'HttpForbiddenError';
+	public override status = HTTP_STATUS.ERROR_CLIENT.FORBIDDEN.CODE;
+	public override statusText = HTTP_STATUS.ERROR_CLIENT.FORBIDDEN.TEXT;
 }
 
 class NotFound extends HttpError {
-	public name = 'HttpNotFoundError';
-	public status = HTTP_STATUS.ERROR_CLIENT.NOT_FOUND.CODE;
-	public statusText = HTTP_STATUS.ERROR_CLIENT.NOT_FOUND.TEXT;
+	public override name = 'HttpNotFoundError';
+	public override status = HTTP_STATUS.ERROR_CLIENT.NOT_FOUND.CODE;
+	public override statusText = HTTP_STATUS.ERROR_CLIENT.NOT_FOUND.TEXT;
 }
 
 class MethodNotAllowed extends HttpError {
-	public name = 'HttpMethodNotAllowedError';
-	public status = HTTP_STATUS.ERROR_CLIENT.METHOD_NOT_ALLOWED.CODE;
-	public statusText = HTTP_STATUS.ERROR_CLIENT.METHOD_NOT_ALLOWED.TEXT;
+	public override name = 'HttpMethodNotAllowedError';
+	public override status = HTTP_STATUS.ERROR_CLIENT.METHOD_NOT_ALLOWED.CODE;
+	public override statusText = HTTP_STATUS.ERROR_CLIENT.METHOD_NOT_ALLOWED.TEXT;
 }
 
 class RequestTimeout extends HttpError {
-	public name = 'HttpRequestTimeoutError';
-	public status = HTTP_STATUS.ERROR_CLIENT.REQUEST_TIMEOUT.CODE;
-	public statusText = HTTP_STATUS.ERROR_CLIENT.REQUEST_TIMEOUT.TEXT;
+	public override name = 'HttpRequestTimeoutError';
+	public override status = HTTP_STATUS.ERROR_CLIENT.REQUEST_TIMEOUT.CODE;
+	public override statusText = HTTP_STATUS.ERROR_CLIENT.REQUEST_TIMEOUT.TEXT;
 }
 
 class Conflict extends HttpError {
-	public name = 'HttpConflictError';
-	public status = HTTP_STATUS.ERROR_CLIENT.CONFLICT.CODE;
-	public statusText = HTTP_STATUS.ERROR_CLIENT.CONFLICT.TEXT;
+	public override name = 'HttpConflictError';
+	public override status = HTTP_STATUS.ERROR_CLIENT.CONFLICT.CODE;
+	public override statusText = HTTP_STATUS.ERROR_CLIENT.CONFLICT.TEXT;
 }
 
 class Gone extends HttpError {
-	public name = 'HttpGoneError';
-	public status = HTTP_STATUS.ERROR_CLIENT.GONE.CODE;
-	public statusText = HTTP_STATUS.ERROR_CLIENT.GONE.TEXT;
+	public override name = 'HttpGoneError';
+	public override status = HTTP_STATUS.ERROR_CLIENT.GONE.CODE;
+	public override statusText = HTTP_STATUS.ERROR_CLIENT.GONE.TEXT;
 }
 
 class LengthRequired extends HttpError {
-	public name = 'HttpLengthRequiredError';
-	public status = HTTP_STATUS.ERROR_CLIENT.LENGTH_REQUIRED.CODE;
-	public statusText = HTTP_STATUS.ERROR_CLIENT.LENGTH_REQUIRED.TEXT;
+	public override name = 'HttpLengthRequiredError';
+	public override status = HTTP_STATUS.ERROR_CLIENT.LENGTH_REQUIRED.CODE;
+	public override statusText = HTTP_STATUS.ERROR_CLIENT.LENGTH_REQUIRED.TEXT;
 }
 
 class UnprocessableContent extends HttpError {
-	public name = 'HttpUnprocessableContentError';
-	public status = HTTP_STATUS.ERROR_CLIENT.UNPROCESSABLE_CONTENT.CODE;
-	public statusText = HTTP_STATUS.ERROR_CLIENT.UNPROCESSABLE_CONTENT.TEXT;
+	public override name = 'HttpUnprocessableContentError';
+	public override status = HTTP_STATUS.ERROR_CLIENT.UNPROCESSABLE_CONTENT.CODE;
+	public override statusText = HTTP_STATUS.ERROR_CLIENT.UNPROCESSABLE_CONTENT.TEXT;
 }
 
 class TooManyRequests extends HttpError {
-	public name = 'HttpTooManyRequestsError';
-	public status = HTTP_STATUS.ERROR_CLIENT.TOO_MANY_REQUESTS.CODE;
-	public statusText = HTTP_STATUS.ERROR_CLIENT.TOO_MANY_REQUESTS.TEXT;
+	public override name = 'HttpTooManyRequestsError';
+	public override status = HTTP_STATUS.ERROR_CLIENT.TOO_MANY_REQUESTS.CODE;
+	public override statusText = HTTP_STATUS.ERROR_CLIENT.TOO_MANY_REQUESTS.TEXT;
 }
 
 class ImATeapot extends HttpError {
-	public name = 'HttpImATeapotError';
-	public status = HTTP_STATUS.ERROR_CLIENT.IM_A_TEAPOT.CODE;
-	public statusText = HTTP_STATUS.ERROR_CLIENT.IM_A_TEAPOT.TEXT;
+	public override name = 'HttpImATeapotError';
+	public override status = HTTP_STATUS.ERROR_CLIENT.IM_A_TEAPOT.CODE;
+	public override statusText = HTTP_STATUS.ERROR_CLIENT.IM_A_TEAPOT.TEXT;
 }
 
 // server
 
 class InternalServerError extends HttpError {
-	public name = 'HttpInternalServerError';
+	public override name = 'HttpInternalServerError';
 }
 
 class NotImplemented extends HttpError {
-	public name = 'HttpServiceUnavailableError';
-	public status = HTTP_STATUS.ERROR_SERVER.NOT_IMPLEMENTED.CODE;
-	public statusText = HTTP_STATUS.ERROR_SERVER.NOT_IMPLEMENTED.TEXT;
+	public override name = 'HttpServiceUnavailableError';
+	public override status = HTTP_STATUS.ERROR_SERVER.NOT_IMPLEMENTED.CODE;
+	public override statusText = HTTP_STATUS.ERROR_SERVER.NOT_IMPLEMENTED.TEXT;
 }
 
 class BadGateway extends HttpError {
-	public name = 'HttpBadGatewayError';
-	public status = HTTP_STATUS.ERROR_SERVER.BAD_GATEWAY.CODE;
-	public statusText = HTTP_STATUS.ERROR_SERVER.BAD_GATEWAY.TEXT;
+	public override name = 'HttpBadGatewayError';
+	public override status = HTTP_STATUS.ERROR_SERVER.BAD_GATEWAY.CODE;
+	public override statusText = HTTP_STATUS.ERROR_SERVER.BAD_GATEWAY.TEXT;
 }
 
 class ServiceUnavailable extends HttpError {
-	public name = 'HttpServiceUnavailableError';
-	public status = HTTP_STATUS.ERROR_SERVER.SERVICE_UNAVAILABLE.CODE;
-	public statusText = HTTP_STATUS.ERROR_SERVER.SERVICE_UNAVAILABLE.TEXT;
+	public override name = 'HttpServiceUnavailableError';
+	public override status = HTTP_STATUS.ERROR_SERVER.SERVICE_UNAVAILABLE.CODE;
+	public override statusText = HTTP_STATUS.ERROR_SERVER.SERVICE_UNAVAILABLE.TEXT;
 }
 
-//
+// Export individual error classes
+export {
+	HttpError,
+	// Client errors
+	BadRequest,
+	Unauthorized,
+	Forbidden,
+	NotFound,
+	MethodNotAllowed,
+	RequestTimeout,
+	Conflict,
+	Gone,
+	LengthRequired,
+	ImATeapot,
+	UnprocessableContent,
+	TooManyRequests,
+	// Server errors
+	InternalServerError,
+	NotImplemented,
+	BadGateway,
+	ServiceUnavailable,
+};
+
+// Namespace export for convenience
 export const HTTP_ERROR = {
 	// base
 	HttpError,
@@ -162,14 +189,30 @@ const _maybeJsonParse = (v: any) => {
 	return v;
 };
 
+/**
+ * Creates an HTTP error from a status code and optional details.
+ * Returns a specific error class for well-known status codes (e.g., 404 → NotFound),
+ * or generic HttpError for unknown codes. Invalid codes default to 500.
+ *
+ * @param code - HTTP status code (400-599).
+ * @param message - Optional error message (defaults to status text).
+ * @param body - Optional response body (will be auto-parsed as JSON if it's a string).
+ * @param cause - Optional error cause/details (will be auto-parsed as JSON if it's a string).
+ *
+ * @returns An HttpError instance (or subclass for well-known codes).
+ *
+ * @example
+ * ```ts
+ * const err = createHttpError(404, 'User not found', { id: 123 });
+ * console.log(err instanceof NotFound); // true
+ * console.log(err.status); // 404
+ * console.log(err.body); // { id: 123 }
+ * ```
+ */
 export const createHttpError = (
 	code: number | string,
 	message?: string | null,
-	// arbitrary content, typically http response body which threw this error
-	// (will be JSON.parse-d if the content is a valid json string)
-	body?: string | null,
-	// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/cause
-	// arbitrary details, typically response text (will be JSON.parse-d if the content is a valid json string)
+	body?: any,
 	cause?: any
 ): HttpError => {
 	const fallback = HTTP_STATUS.ERROR_SERVER.INTERNAL_SERVER_ERROR;
@@ -198,14 +241,28 @@ export const createHttpError = (
 	return e;
 };
 
+/**
+ * Extracts a human-readable error message from various error formats.
+ * Tries multiple strategies to find the best message, with fallbacks.
+ *
+ * Priority order:
+ * 1. e.cause.message / e.cause.code / e.cause (if string)
+ * 2. e.body.error.message / e.body.message / e.body.error / e.body (if string)
+ * 3. e.message
+ * 4. e.name
+ * 5. e.toString()
+ * 6. "Unknown Error"
+ *
+ * @param e - The error to extract a message from (can be any type).
+ * @param stripErrorPrefix - Whether to remove "Error: " prefix from the message (default: true).
+ *
+ * @returns A human-readable error message string.
+ */
 export const getErrorMessage = (e: any, stripErrorPrefix = true): string => {
 	if (!e) return '';
 
-	// PROBLEM is that error may bubble from various sources which are not always under control
-	// and even if they were it still may not be trivial to keep similar structure on each error boundary...
-	// So, we'll just do what we can, it will not be perfect, but should handle most cases most of the time.
-
-	// Also, I'm relying on some of my own opinionated conventions as well...
+	// Errors may bubble from various sources which are not always under control.
+	// We try our best to extract a meaningful message using common conventions.
 	const cause = _maybeJsonParse(e?.cause);
 	const body = _maybeJsonParse(e?.body);
 

@@ -1,6 +1,10 @@
+/**
+ * HTTP status codes organized by category with convenience shortcuts.
+ * Provides comprehensive coverage of standard HTTP status codes.
+ */
 // prettier-ignore
 export class HTTP_STATUS {
-	// full db
+	// Full database of HTTP status codes
 
 	// 1xx
 	static readonly INFO = {
@@ -26,7 +30,7 @@ export class HTTP_STATUS {
 
 	// 3xx
 	static readonly REDIRECT = {
-		MUTLIPLE_CHOICES:                { CODE: 300, TEXT: 'Multiple Choices' },
+		MULTIPLE_CHOICES:                { CODE: 300, TEXT: 'Multiple Choices' },
 		MOVED_PERMANENTLY:               { CODE: 301, TEXT: 'Moved Permanently' },
 		FOUND:                           { CODE: 302, TEXT: 'Found' },
 		SEE_OTHER:                       { CODE: 303, TEXT: 'See Other' },
@@ -84,7 +88,7 @@ export class HTTP_STATUS {
 		NETWORK_AUTH_REQUIRED:           { CODE: 511, TEXT: 'Network Authentication Required' },
 	};
 
-	// few hand picked direct code shortcuts
+	// Convenience shortcuts: direct access to frequently used status codes
 	
 	// 2xx
 	static readonly OK                    = HTTP_STATUS.SUCCESS.OK.CODE;
@@ -93,7 +97,7 @@ export class HTTP_STATUS {
 	static readonly NO_CONTENT            = HTTP_STATUS.SUCCESS.NO_CONTENT.CODE;
 
 	// 3xx
-	static readonly MUTLIPLE_CHOICES      = HTTP_STATUS.REDIRECT.MUTLIPLE_CHOICES.CODE;
+	static readonly MULTIPLE_CHOICES      = HTTP_STATUS.REDIRECT.MULTIPLE_CHOICES.CODE;
 	static readonly FOUND                 = HTTP_STATUS.REDIRECT.FOUND.CODE;
 	static readonly NOT_MODIFIED          = HTTP_STATUS.REDIRECT.NOT_MODIFIED.CODE;
 	static readonly MOVED_PERMANENTLY     = HTTP_STATUS.REDIRECT.MOVED_PERMANENTLY.CODE;
@@ -116,7 +120,18 @@ export class HTTP_STATUS {
 	static readonly NOT_IMPLEMENTED       = HTTP_STATUS.ERROR_SERVER.NOT_IMPLEMENTED.CODE;
 	static readonly SERVICE_UNAVAILABLE   = HTTP_STATUS.ERROR_SERVER.SERVICE_UNAVAILABLE.CODE;
 
-	//
+	/**
+	 * Finds a status code definition by its numeric code.
+	 *
+	 * @param code - The HTTP status code to look up (e.g., 200, 404, 500).
+	 * @returns An object with CODE, TEXT, _TYPE (category), and _KEY (name), or null if not found.
+	 *
+	 * @example
+	 * ```ts
+	 * const status = HTTP_STATUS.findByCode(404);
+	 * // { CODE: 404, TEXT: "Not Found", _TYPE: "ERROR_CLIENT", _KEY: "NOT_FOUND" }
+	 * ```
+	 */
 	static findByCode(
 		code: number | string
 	): { CODE: number; TEXT: string; _TYPE: string; _KEY: string } | null {

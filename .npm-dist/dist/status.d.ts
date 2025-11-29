@@ -1,3 +1,7 @@
+/**
+ * HTTP status codes organized by category with convenience shortcuts.
+ * Provides comprehensive coverage of standard HTTP status codes.
+ */
 export declare class HTTP_STATUS {
     static readonly INFO: {
         CONTINUE: {
@@ -60,7 +64,7 @@ export declare class HTTP_STATUS {
         };
     };
     static readonly REDIRECT: {
-        MUTLIPLE_CHOICES: {
+        MULTIPLE_CHOICES: {
             CODE: number;
             TEXT: string;
         };
@@ -257,7 +261,7 @@ export declare class HTTP_STATUS {
     static readonly CREATED: number;
     static readonly ACCEPTED: number;
     static readonly NO_CONTENT: number;
-    static readonly MUTLIPLE_CHOICES: number;
+    static readonly MULTIPLE_CHOICES: number;
     static readonly FOUND: number;
     static readonly NOT_MODIFIED: number;
     static readonly MOVED_PERMANENTLY: number;
@@ -275,6 +279,18 @@ export declare class HTTP_STATUS {
     static readonly INTERNAL_SERVER_ERROR: number;
     static readonly NOT_IMPLEMENTED: number;
     static readonly SERVICE_UNAVAILABLE: number;
+    /**
+     * Finds a status code definition by its numeric code.
+     *
+     * @param code - The HTTP status code to look up (e.g., 200, 404, 500).
+     * @returns An object with CODE, TEXT, _TYPE (category), and _KEY (name), or null if not found.
+     *
+     * @example
+     * ```ts
+     * const status = HTTP_STATUS.findByCode(404);
+     * // { CODE: 404, TEXT: "Not Found", _TYPE: "ERROR_CLIENT", _KEY: "NOT_FOUND" }
+     * ```
+     */
     static findByCode(code: number | string): {
         CODE: number;
         TEXT: string;
