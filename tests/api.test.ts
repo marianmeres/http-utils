@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "@std/assert";
-import { createHttpApi, HTTP_ERROR } from "../src/index.ts";
+import { createHttpApi, HTTP_ERROR } from "../src/mod.ts";
 
 const hostname = "127.0.0.1";
 const CUSTOM_ERR_MSG = "this is custom error";
@@ -18,8 +18,8 @@ async function createTestServer(port: number): Promise<Deno.HttpServer> {
 		const url = new URL(req.url);
 		const headers = new Headers({
 			"Content-Type": "application/json",
-			"hey": "ho",
-			"x": req.headers.get("x") || "",
+			hey: "ho",
+			x: req.headers.get("x") || "",
 		});
 
 		if (url.pathname === "/echo") {
@@ -30,10 +30,10 @@ async function createTestServer(port: number): Promise<Deno.HttpServer> {
 				return new Response('{"foo":"bar"}', { status: 200, headers });
 			}
 		} else {
-			return new Response(
-				`{"error":{"message":"${CUSTOM_ERR_MSG}"}}`,
-				{ status: 404, headers }
-			);
+			return new Response(`{"error":{"message":"${CUSTOM_ERR_MSG}"}}`, {
+				status: 404,
+				headers,
+			});
 		}
 	};
 
@@ -164,9 +164,14 @@ Deno.test("custom local error message extractor", async () => {
 		const api = createHttpApi();
 
 		try {
-			await api.get(`${url}/asdf`, undefined, undefined, (body: any, _resp: Response) => {
-				return body.error.message.toUpperCase();
-			});
+			await api.get(
+				`${url}/asdf`,
+				undefined,
+				undefined,
+				(body: any, _resp: Response) => {
+					return body.error.message.toUpperCase();
+				}
+			);
 			assert(false); // must not be reached
 		} catch (e) {
 			assert(e instanceof HTTP_ERROR.NotFound);
@@ -185,9 +190,13 @@ Deno.test("custom factory error message extractor", async () => {
 	const server = await createTestServer(port);
 
 	try {
-		const api = createHttpApi(undefined, undefined, (body: any, _resp: Response) => {
-			return body.error.message.toUpperCase();
-		});
+		const api = createHttpApi(
+			undefined,
+			undefined,
+			(body: any, _resp: Response) => {
+				return body.error.message.toUpperCase();
+			}
+		);
 
 		try {
 			await api.get(`${url}/asdf`);
@@ -209,7 +218,10 @@ Deno.test("custom global error message extractor", async () => {
 	const server = await createTestServer(port);
 
 	try {
-		createHttpApi.defaultErrorMessageExtractor = (body: any, _resp: Response) => {
+		createHttpApi.defaultErrorMessageExtractor = (
+			body: any,
+			_resp: Response
+		) => {
 			return body.error.message.toUpperCase();
 		};
 
@@ -280,7 +292,10 @@ Deno.test("createHttpApi merge default params", async () => {
 
 Deno.test("url build", () => {
 	assertEquals(createHttpApi().url("/foo"), "/foo");
-	assertEquals(createHttpApi("http://example").url("/foo"), "http://example/foo");
+	assertEquals(
+		createHttpApi("http://example").url("/foo"),
+		"http://example/foo"
+	);
 	assertEquals(
 		createHttpApi("http://ignored").url("http://another/foo"),
 		"http://another/foo"

@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "@std/assert";
-import { createHttpApi } from "../src/index.ts";
+import { createHttpApi } from "../src/mod.ts";
 
 const hostname = "127.0.0.1";
 

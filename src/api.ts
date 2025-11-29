@@ -187,13 +187,381 @@ const _fetch = async (
 };
 
 /**
+ * HTTP API client with convenient defaults and error handling.
+ */
+export class HttpApi {
+	#base?: string | null;
+	#defaults?: Partial<BaseFetchParams> | (() => Promise<Partial<BaseFetchParams>>);
+	#factoryErrorMessageExtractor?: ErrorMessageExtractor | null | undefined;
+
+	constructor(
+		base?: string | null,
+		defaults?: Partial<BaseFetchParams> | (() => Promise<Partial<BaseFetchParams>>),
+		factoryErrorMessageExtractor?: ErrorMessageExtractor | null | undefined
+	) {
+		this.#base = base;
+		this.#defaults = defaults;
+		this.#factoryErrorMessageExtractor = factoryErrorMessageExtractor;
+	}
+
+	#merge<T = any>(a: any, b: any): T {
+		return deepMerge<T>(a, b);
+	}
+
+	async #getDefs(): Promise<Partial<BaseFetchParams>> {
+		if (typeof this.#defaults === 'function') {
+			return { ...(await this.#defaults()) };
+		}
+		return { ...(this.#defaults || {}) };
+	}
+
+	#buildPath(path: string, base?: string | null): string {
+		base = `${base || ''}`;
+		path = `${path || ''}`;
+		return /^https?:/.test(path) ? path : base + path;
+	}
+
+	/**
+	 * Performs a GET request (new options API - recommended).
+	 *
+	 * @param path - The request path (will be appended to base URL if set).
+	 * @param options - Request options object.
+	 * @returns The response body (auto-parsed as JSON if possible), or Response if `raw: true`.
+	 * @throws {HttpError} When the response is not OK and `assert` is true (default).
+	 *
+	 * @example
+	 * ```ts
+	 * const data = await api.get('/users', {
+	 *   params: { headers: { 'X-Custom': 'value' } },
+	 *   respHeaders: {}
+	 * });
+	 * ```
+	 */
+	async get(path: string, options: GetOptions): Promise<any>;
+
+	/**
+	 * Performs a GET request (legacy API).
+	 *
+	 * @param path - The request path (will be appended to base URL if set).
+	 * @param params - Optional fetch parameters.
+	 * @param respHeaders - Optional object to be mutated with response headers.
+	 * @param errorMessageExtractor - Optional custom error message extractor.
+	 * @param _dumpParams - Internal parameter for testing.
+	 * @returns The response body (auto-parsed as JSON if possible), or Response if `raw: true`.
+	 * @throws {HttpError} When the response is not OK and `assert` is true (default).
+	 */
+	async get(
+		path: string,
+		params?: FetchParams,
+		respHeaders?: ResponseHeaders | null,
+		errorMessageExtractor?: ErrorMessageExtractor | null,
+		_dumpParams?: boolean
+	): Promise<any>;
+
+	async get(
+		path: string,
+		paramsOrOptions?: FetchParams | GetOptions,
+		respHeaders?: ResponseHeaders | null,
+		errorMessageExtractor?: ErrorMessageExtractor | null,
+		_dumpParams = false
+	): Promise<any> {
+		// Detect which API is being used
+		let params: FetchParams | undefined;
+		let headers: ResponseHeaders | null = null;
+		let extractor: ErrorMessageExtractor | null | undefined = null;
+
+		if (paramsOrOptions && ('respHeaders' in paramsOrOptions || 'errorExtractor' in paramsOrOptions)) {
+			// New options API
+			const opts = paramsOrOptions as GetOptions;
+			params = opts.params;
+			headers = opts.respHeaders ?? null;
+			extractor = opts.errorExtractor ?? null;
+		} else {
+			// Legacy positional API
+			params = paramsOrOptions as FetchParams | undefined;
+			headers = respHeaders ?? null;
+			extractor = errorMessageExtractor ?? null;
+		}
+
+		path = this.#buildPath(path, this.#base);
+		return _fetch(
+			this.#merge(await this.#getDefs(), { ...params, method: 'GET', path }),
+			headers,
+			extractor ?? this.#factoryErrorMessageExtractor,
+			_dumpParams
+		);
+	}
+
+	/**
+	 * Performs a POST request (new options API - recommended).
+	 *
+	 * @param path - The request path (will be appended to base URL if set).
+	 * @param options - Request options object including data and params.
+	 * @returns The response body (auto-parsed as JSON if possible), or Response if `raw: true`.
+	 * @throws {HttpError} When the response is not OK and `assert` is true (default).
+	 *
+	 * @example
+	 * ```ts
+	 * await api.post('/users', {
+	 *   data: { name: 'John' },
+	 *   params: { headers: { 'X-Custom': 'value' } },
+	 *   respHeaders: {}
+	 * });
+	 * ```
+	 */
+	async post(path: string, options: DataOptions): Promise<any>;
+
+	/**
+	 * Performs a POST request (legacy API).
+	 *
+	 * @param path - The request path (will be appended to base URL if set).
+	 * @param data - Request body data.
+	 * @param params - Optional fetch parameters.
+	 * @param respHeaders - Optional object to be mutated with response headers.
+	 * @param errorMessageExtractor - Optional custom error message extractor.
+	 * @param _dumpParams - Internal parameter for testing.
+	 * @returns The response body (auto-parsed as JSON if possible), or Response if `raw: true`.
+	 * @throws {HttpError} When the response is not OK and `assert` is true (default).
+	 */
+	async post(
+		path: string,
+		data?: any,
+		params?: FetchParams,
+		respHeaders?: ResponseHeaders | null,
+		errorMessageExtractor?: ErrorMessageExtractor | null,
+		_dumpParams?: boolean
+	): Promise<any>;
+
+	async post(
+		path: string,
+		dataOrOptions?: any | DataOptions,
+		params?: FetchParams,
+		respHeaders?: ResponseHeaders | null,
+		errorMessageExtractor?: ErrorMessageExtractor | null,
+		_dumpParams = false
+	): Promise<any> {
+		// Detect which API is being used
+		let data: any = null;
+		let fetchParams: FetchParams | undefined;
+		let headers: ResponseHeaders | null = null;
+		let extractor: ErrorMessageExtractor | null | undefined = null;
+
+		if (dataOrOptions && (
+			'data' in dataOrOptions ||
+			'params' in dataOrOptions ||
+			'respHeaders' in dataOrOptions ||
+			'errorExtractor' in dataOrOptions
+		)) {
+			// New options API
+			const opts = dataOrOptions as DataOptions;
+			data = opts.data ?? null;
+			fetchParams = opts.params;
+			headers = opts.respHeaders ?? null;
+			extractor = opts.errorExtractor ?? null;
+		} else {
+			// Legacy positional API
+			data = dataOrOptions ?? null;
+			fetchParams = params;
+			headers = respHeaders ?? null;
+			extractor = errorMessageExtractor ?? null;
+		}
+
+		path = this.#buildPath(path, this.#base);
+		return _fetch(
+			this.#merge(await this.#getDefs(), { ...(fetchParams || {}), data, method: 'POST', path }),
+			headers,
+			extractor ?? this.#factoryErrorMessageExtractor,
+			_dumpParams
+		);
+	}
+
+	/** Performs a PUT request (new options API). @see post */
+	async put(path: string, options: DataOptions): Promise<any>;
+	/** Performs a PUT request (legacy API). @see post */
+	async put(
+		path: string,
+		data?: any,
+		params?: FetchParams,
+		respHeaders?: ResponseHeaders | null,
+		errorMessageExtractor?: ErrorMessageExtractor | null,
+		_dumpParams?: boolean
+	): Promise<any>;
+	async put(
+		path: string,
+		dataOrOptions?: any | DataOptions,
+		params?: FetchParams,
+		respHeaders?: ResponseHeaders | null,
+		errorMessageExtractor?: ErrorMessageExtractor | null,
+		_dumpParams = false
+	): Promise<any> {
+		let data: any = null;
+		let fetchParams: FetchParams | undefined;
+		let headers: ResponseHeaders | null = null;
+		let extractor: ErrorMessageExtractor | null | undefined = null;
+
+		if (dataOrOptions && (
+			'data' in dataOrOptions ||
+			'params' in dataOrOptions ||
+			'respHeaders' in dataOrOptions ||
+			'errorExtractor' in dataOrOptions
+		)) {
+			const opts = dataOrOptions as DataOptions;
+			data = opts.data ?? null;
+			fetchParams = opts.params;
+			headers = opts.respHeaders ?? null;
+			extractor = opts.errorExtractor ?? null;
+		} else {
+			data = dataOrOptions ?? null;
+			fetchParams = params;
+			headers = respHeaders ?? null;
+			extractor = errorMessageExtractor ?? null;
+		}
+
+		path = this.#buildPath(path, this.#base);
+		return _fetch(
+			this.#merge(await this.#getDefs(), { ...(fetchParams || {}), data, method: 'PUT', path }),
+			headers,
+			extractor ?? this.#factoryErrorMessageExtractor,
+			_dumpParams
+		);
+	}
+
+	/** Performs a PATCH request (new options API). @see post */
+	async patch(path: string, options: DataOptions): Promise<any>;
+	/** Performs a PATCH request (legacy API). @see post */
+	async patch(
+		path: string,
+		data?: any,
+		params?: FetchParams,
+		respHeaders?: ResponseHeaders | null,
+		errorMessageExtractor?: ErrorMessageExtractor | null,
+		_dumpParams?: boolean
+	): Promise<any>;
+	async patch(
+		path: string,
+		dataOrOptions?: any | DataOptions,
+		params?: FetchParams,
+		respHeaders?: ResponseHeaders | null,
+		errorMessageExtractor?: ErrorMessageExtractor | null,
+		_dumpParams = false
+	): Promise<any> {
+		let data: any = null;
+		let fetchParams: FetchParams | undefined;
+		let headers: ResponseHeaders | null = null;
+		let extractor: ErrorMessageExtractor | null | undefined = null;
+
+		if (dataOrOptions && (
+			'data' in dataOrOptions ||
+			'params' in dataOrOptions ||
+			'respHeaders' in dataOrOptions ||
+			'errorExtractor' in dataOrOptions
+		)) {
+			const opts = dataOrOptions as DataOptions;
+			data = opts.data ?? null;
+			fetchParams = opts.params;
+			headers = opts.respHeaders ?? null;
+			extractor = opts.errorExtractor ?? null;
+		} else {
+			data = dataOrOptions ?? null;
+			fetchParams = params;
+			headers = respHeaders ?? null;
+			extractor = errorMessageExtractor ?? null;
+		}
+
+		path = this.#buildPath(path, this.#base);
+		return _fetch(
+			this.#merge(await this.#getDefs(), { ...(fetchParams || {}), data, method: 'PATCH', path }),
+			headers,
+			extractor ?? this.#factoryErrorMessageExtractor,
+			_dumpParams
+		);
+	}
+
+	/**
+	 * Performs a DELETE request (new options API).
+	 * Note: Request body in DELETE is allowed per HTTP spec.
+	 * @see post
+	 */
+	async del(path: string, options: DataOptions): Promise<any>;
+	/** Performs a DELETE request (legacy API). @see post */
+	async del(
+		path: string,
+		data?: any,
+		params?: FetchParams,
+		respHeaders?: ResponseHeaders | null,
+		errorMessageExtractor?: ErrorMessageExtractor | null,
+		_dumpParams?: boolean
+	): Promise<any>;
+	async del(
+		path: string,
+		dataOrOptions?: any | DataOptions,
+		params?: FetchParams,
+		respHeaders?: ResponseHeaders | null,
+		errorMessageExtractor?: ErrorMessageExtractor | null,
+		_dumpParams = false
+	): Promise<any> {
+		let data: any = null;
+		let fetchParams: FetchParams | undefined;
+		let headers: ResponseHeaders | null = null;
+		let extractor: ErrorMessageExtractor | null | undefined = null;
+
+		if (dataOrOptions && (
+			'data' in dataOrOptions ||
+			'params' in dataOrOptions ||
+			'respHeaders' in dataOrOptions ||
+			'errorExtractor' in dataOrOptions
+		)) {
+			const opts = dataOrOptions as DataOptions;
+			data = opts.data ?? null;
+			fetchParams = opts.params;
+			headers = opts.respHeaders ?? null;
+			extractor = opts.errorExtractor ?? null;
+		} else {
+			data = dataOrOptions ?? null;
+			fetchParams = params;
+			headers = respHeaders ?? null;
+			extractor = errorMessageExtractor ?? null;
+		}
+
+		path = this.#buildPath(path, this.#base);
+		return _fetch(
+			this.#merge(await this.#getDefs(), { ...(fetchParams || {}), data, method: 'DELETE', path }),
+			headers,
+			extractor ?? this.#factoryErrorMessageExtractor,
+			_dumpParams
+		);
+	}
+
+	/**
+	 * Helper method to build the full URL from a path.
+	 *
+	 * @param path - The path to resolve (absolute URLs are returned as-is).
+	 * @returns The resolved URL (base + path, or just path if it's already absolute).
+	 */
+	url(path: string): string {
+		return this.#buildPath(path, this.#base);
+	}
+
+	/**
+	 * Get or set the base URL for all requests.
+	 */
+	get base(): string | null | undefined {
+		return this.#base;
+	}
+
+	set base(v: string | null | undefined) {
+		this.#base = v;
+	}
+}
+
+/**
  * Creates an HTTP API client with convenient defaults and error handling.
  *
  * @param base - Optional base URL to prepend to all requests. Can be changed later via the `base` property.
  * @param defaults - Optional default parameters to merge with each request. Can be an object or async function returning an object.
  * @param factoryErrorMessageExtractor - Optional function to extract error messages from failed responses.
  *
- * @returns An object with HTTP methods (get, post, put, patch, del) and utility methods (url, base).
+ * @returns An HttpApi instance with methods: get, post, put, patch, del, url, base.
  *
  * @example
  * ```ts
@@ -209,317 +577,8 @@ export function createHttpApi(
 	base?: string | null,
 	defaults?: Partial<BaseFetchParams> | (() => Promise<Partial<BaseFetchParams>>),
 	factoryErrorMessageExtractor?: ErrorMessageExtractor | null | undefined
-) {
-	const _merge = <T = any>(a: any, b: any): T => {
-		return deepMerge<T>(a, b);
-	};
-
-	const _getDefs = async (): Promise<Partial<BaseFetchParams>> => {
-		if (typeof defaults === 'function') {
-			return { ...(await defaults()) };
-		}
-		return { ...(defaults || {}) };
-	};
-
-	const _buildPath = (path: string, base?: string | null) => {
-		base = `${base || ''}`;
-		path = `${path || ''}`;
-		return /^https?:/.test(path) ? path : base + path;
-	};
-
-	return {
-		/**
-		 * Performs a GET request.
-		 *
-		 * Supports two calling styles:
-		 * 1. New (recommended): `get(path, { params, respHeaders, errorExtractor })`
-		 * 2. Legacy: `get(path, params, respHeaders, errorExtractor)`
-		 *
-		 * @param path - The request path (will be appended to base URL if set).
-		 * @param paramsOrOptions - FetchParams object OR GetOptions object (new API).
-		 * @param respHeaders - (Legacy API) Optional object to be mutated with response headers.
-		 * @param errorMessageExtractor - (Legacy API) Optional custom error message extractor.
-		 * @param _dumpParams - Internal parameter for testing.
-		 *
-		 * @returns The response body (auto-parsed as JSON if possible), or Response if `raw: true`.
-		 * @throws {HttpError} When the response is not OK and `assert` is true (default).
-		 *
-		 * @example
-		 * ```ts
-		 * // New API (recommended)
-		 * const data = await api.get('/users', {
-		 *   params: { headers: { 'X-Custom': 'value' } },
-		 *   respHeaders: {}
-		 * });
-		 *
-		 * // Legacy API (still works)
-		 * const respHeaders = {};
-		 * const data = await api.get('/users', { headers: {} }, respHeaders);
-		 * ```
-		 */
-		async get(
-			path: string,
-			paramsOrOptions?: FetchParams | GetOptions,
-			respHeaders?: ResponseHeaders | null,
-			errorMessageExtractor?: ErrorMessageExtractor | null,
-			_dumpParams = false
-		) {
-			// Detect which API is being used
-			let params: FetchParams | undefined;
-			let headers: ResponseHeaders | null = null;
-			let extractor: ErrorMessageExtractor | null | undefined = null;
-
-			if (paramsOrOptions && ('respHeaders' in paramsOrOptions || 'errorExtractor' in paramsOrOptions)) {
-				// New options API
-				const opts = paramsOrOptions as GetOptions;
-				params = opts.params;
-				headers = opts.respHeaders ?? null;
-				extractor = opts.errorExtractor ?? null;
-			} else {
-				// Legacy positional API
-				params = paramsOrOptions as FetchParams | undefined;
-				headers = respHeaders ?? null;
-				extractor = errorMessageExtractor ?? null;
-			}
-
-			path = _buildPath(path, base);
-			return _fetch(
-				_merge(await _getDefs(), { ...params, method: 'GET', path }),
-				headers,
-				extractor ?? factoryErrorMessageExtractor,
-				_dumpParams
-			);
-		},
-
-		/**
-		 * Performs a POST request.
-		 *
-		 * Supports two calling styles:
-		 * 1. New (recommended): `post(path, { data, params, respHeaders, errorExtractor })`
-		 * 2. Legacy: `post(path, data, params, respHeaders, errorExtractor)`
-		 *
-		 * @param path - The request path (will be appended to base URL if set).
-		 * @param dataOrOptions - Request body OR DataOptions object (new API).
-		 * @param params - (Legacy API) Optional fetch parameters.
-		 * @param respHeaders - (Legacy API) Optional object to be mutated with response headers.
-		 * @param errorMessageExtractor - (Legacy API) Optional custom error message extractor.
-		 * @param _dumpParams - Internal parameter for testing.
-		 *
-		 * @returns The response body (auto-parsed as JSON if possible), or Response if `raw: true`.
-		 * @throws {HttpError} When the response is not OK and `assert` is true (default).
-		 *
-		 * @example
-		 * ```ts
-		 * // New API (recommended)
-		 * await api.post('/users', {
-		 *   data: { name: 'John' },
-		 *   params: { headers: { 'X-Custom': 'value' } },
-		 *   respHeaders: {}
-		 * });
-		 *
-		 * // Legacy API (still works)
-		 * const respHeaders = {};
-		 * await api.post('/users', { name: 'John' }, {}, respHeaders);
-		 * ```
-		 */
-		async post(
-			path: string,
-			dataOrOptions?: any | DataOptions,
-			params?: FetchParams,
-			respHeaders?: ResponseHeaders | null,
-			errorMessageExtractor?: ErrorMessageExtractor | null,
-			_dumpParams = false
-		) {
-			// Detect which API is being used
-			let data: any = null;
-			let fetchParams: FetchParams | undefined;
-			let headers: ResponseHeaders | null = null;
-			let extractor: ErrorMessageExtractor | null | undefined = null;
-
-			if (dataOrOptions && (
-				'data' in dataOrOptions ||
-				'params' in dataOrOptions ||
-				'respHeaders' in dataOrOptions ||
-				'errorExtractor' in dataOrOptions
-			)) {
-				// New options API
-				const opts = dataOrOptions as DataOptions;
-				data = opts.data ?? null;
-				fetchParams = opts.params;
-				headers = opts.respHeaders ?? null;
-				extractor = opts.errorExtractor ?? null;
-			} else {
-				// Legacy positional API
-				data = dataOrOptions ?? null;
-				fetchParams = params;
-				headers = respHeaders ?? null;
-				extractor = errorMessageExtractor ?? null;
-			}
-
-			path = _buildPath(path, base);
-			return _fetch(
-				_merge(await _getDefs(), { ...(fetchParams || {}), data, method: 'POST', path }),
-				headers,
-				extractor ?? factoryErrorMessageExtractor,
-				_dumpParams
-			);
-		},
-
-		/**
-		 * Performs a PUT request. Supports both new options API and legacy positional API.
-		 * @see post for usage examples
-		 */
-		async put(
-			path: string,
-			dataOrOptions?: any | DataOptions,
-			params?: FetchParams,
-			respHeaders?: ResponseHeaders | null,
-			errorMessageExtractor?: ErrorMessageExtractor | null,
-			_dumpParams = false
-		) {
-			// Detect which API is being used (same logic as POST)
-			let data: any = null;
-			let fetchParams: FetchParams | undefined;
-			let headers: ResponseHeaders | null = null;
-			let extractor: ErrorMessageExtractor | null | undefined = null;
-
-			if (dataOrOptions && (
-				'data' in dataOrOptions ||
-				'params' in dataOrOptions ||
-				'respHeaders' in dataOrOptions ||
-				'errorExtractor' in dataOrOptions
-			)) {
-				const opts = dataOrOptions as DataOptions;
-				data = opts.data ?? null;
-				fetchParams = opts.params;
-				headers = opts.respHeaders ?? null;
-				extractor = opts.errorExtractor ?? null;
-			} else {
-				data = dataOrOptions ?? null;
-				fetchParams = params;
-				headers = respHeaders ?? null;
-				extractor = errorMessageExtractor ?? null;
-			}
-
-			path = _buildPath(path, base);
-			return _fetch(
-				_merge(await _getDefs(), { ...(fetchParams || {}), data, method: 'PUT', path }),
-				headers,
-				extractor ?? factoryErrorMessageExtractor,
-				_dumpParams
-			);
-		},
-
-		/**
-		 * Performs a PATCH request. Supports both new options API and legacy positional API.
-		 * @see post for usage examples
-		 */
-		async patch(
-			path: string,
-			dataOrOptions?: any | DataOptions,
-			params?: FetchParams,
-			respHeaders?: ResponseHeaders | null,
-			errorMessageExtractor?: ErrorMessageExtractor | null,
-			_dumpParams = false
-		) {
-			// Detect which API is being used (same logic as POST)
-			let data: any = null;
-			let fetchParams: FetchParams | undefined;
-			let headers: ResponseHeaders | null = null;
-			let extractor: ErrorMessageExtractor | null | undefined = null;
-
-			if (dataOrOptions && (
-				'data' in dataOrOptions ||
-				'params' in dataOrOptions ||
-				'respHeaders' in dataOrOptions ||
-				'errorExtractor' in dataOrOptions
-			)) {
-				const opts = dataOrOptions as DataOptions;
-				data = opts.data ?? null;
-				fetchParams = opts.params;
-				headers = opts.respHeaders ?? null;
-				extractor = opts.errorExtractor ?? null;
-			} else {
-				data = dataOrOptions ?? null;
-				fetchParams = params;
-				headers = respHeaders ?? null;
-				extractor = errorMessageExtractor ?? null;
-			}
-
-			path = _buildPath(path, base);
-			return _fetch(
-				_merge(await _getDefs(), { ...(fetchParams || {}), data, method: 'PATCH', path }),
-				headers,
-				extractor ?? factoryErrorMessageExtractor,
-				_dumpParams
-			);
-		},
-
-		/**
-		 * Performs a DELETE request. Supports both new options API and legacy positional API.
-		 * Note: Request body in DELETE is allowed per HTTP spec.
-		 * @see post for usage examples
-		 */
-		async del(
-			path: string,
-			dataOrOptions?: any | DataOptions,
-			params?: FetchParams,
-			respHeaders?: ResponseHeaders | null,
-			errorMessageExtractor?: ErrorMessageExtractor | null,
-			_dumpParams = false
-		) {
-			// Detect which API is being used (same logic as POST)
-			let data: any = null;
-			let fetchParams: FetchParams | undefined;
-			let headers: ResponseHeaders | null = null;
-			let extractor: ErrorMessageExtractor | null | undefined = null;
-
-			if (dataOrOptions && (
-				'data' in dataOrOptions ||
-				'params' in dataOrOptions ||
-				'respHeaders' in dataOrOptions ||
-				'errorExtractor' in dataOrOptions
-			)) {
-				const opts = dataOrOptions as DataOptions;
-				data = opts.data ?? null;
-				fetchParams = opts.params;
-				headers = opts.respHeaders ?? null;
-				extractor = opts.errorExtractor ?? null;
-			} else {
-				data = dataOrOptions ?? null;
-				fetchParams = params;
-				headers = respHeaders ?? null;
-				extractor = errorMessageExtractor ?? null;
-			}
-
-			path = _buildPath(path, base);
-			return _fetch(
-				_merge(await _getDefs(), { ...(fetchParams || {}), data, method: 'DELETE', path }),
-				headers,
-				extractor ?? factoryErrorMessageExtractor,
-				_dumpParams
-			);
-		},
-
-		/**
-		 * Helper method to build the full URL from a path.
-		 *
-		 * @param path - The path to resolve (absolute URLs are returned as-is).
-		 * @returns The resolved URL (base + path, or just path if it's already absolute).
-		 */
-		url: (path: string) => _buildPath(path, base),
-
-		/**
-		 * Get or set the base URL for all requests.
-		 */
-		get base(): string | null | undefined {
-			return base;
-		},
-
-		set base(v: string | null | undefined) {
-			base = v;
-		},
-	};
+): HttpApi {
+	return new HttpApi(base, defaults, factoryErrorMessageExtractor);
 }
 
 createHttpApi.defaultErrorMessageExtractor = null as
