@@ -12,7 +12,6 @@ Opinionated, lightweight HTTP client wrapper for `fetch` with type-safe errors a
 
 ## Installation
 
-### Deno
 ```shell
 deno add jsr:@marianmeres/http-utils
 ```
