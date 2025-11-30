@@ -268,6 +268,9 @@ const error = createHttpError(404, "User not found", { userId: 123 });
 throw error;
 ```
 
-## License
+## Package Identity
 
-MIT
+- **Name:** @marianmeres/http-utils
+- **Author:** Marian Meres
+- **Repository:** https://github.com/marianmeres/http-utils
+- **License:** MIT
