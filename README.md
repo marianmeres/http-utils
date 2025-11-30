@@ -1,5 +1,8 @@
 # @marianmeres/http-utils
 
+[![NPM version](https://img.shields.io/npm/v/@marianmeres/http-utils)](https://www.npmjs.com/package/@marianmeres/http-utils)
+[![JSR version](https://jsr.io/badges/@marianmeres/http-utils)](https://jsr.io/@marianmeres/http-utils)
+
 Opinionated, lightweight HTTP client wrapper for `fetch` with type-safe errors and convenient defaults.
 
 ## Features
