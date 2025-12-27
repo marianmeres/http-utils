@@ -1,6 +1,35 @@
 /**
+ * @module status
+ *
  * HTTP status codes organized by category with convenience shortcuts.
- * Provides comprehensive coverage of standard HTTP status codes.
+ */
+
+/**
+ * HTTP status codes organized by category with convenience shortcuts.
+ *
+ * Categories:
+ * - `INFO` (1xx): Informational responses
+ * - `SUCCESS` (2xx): Successful responses
+ * - `REDIRECT` (3xx): Redirection messages
+ * - `ERROR_CLIENT` (4xx): Client error responses
+ * - `ERROR_SERVER` (5xx): Server error responses
+ *
+ * @example
+ * ```ts
+ * import { HTTP_STATUS } from "@marianmeres/http-utils";
+ *
+ * // Access by category
+ * HTTP_STATUS.SUCCESS.OK.CODE          // 200
+ * HTTP_STATUS.ERROR_CLIENT.NOT_FOUND.CODE  // 404
+ *
+ * // Direct shortcuts
+ * HTTP_STATUS.OK              // 200
+ * HTTP_STATUS.NOT_FOUND       // 404
+ *
+ * // Lookup by code
+ * const info = HTTP_STATUS.findByCode(404);
+ * // { CODE: 404, TEXT: "Not Found", _TYPE: "ERROR_CLIENT", _KEY: "NOT_FOUND" }
+ * ```
  */
 // prettier-ignore
 export class HTTP_STATUS {

@@ -1,7 +1,28 @@
+/**
+ * @module error
+ *
+ * HTTP error classes and utilities for type-safe error handling.
+ * Provides specific error classes for well-known HTTP status codes.
+ */
+
 import { HTTP_STATUS } from './status.ts';
 
 /**
  * Base HTTP error class. Extends Error with HTTP-specific properties.
+ * All specific error classes (NotFound, BadRequest, etc.) extend this class.
+ *
+ * @example
+ * ```ts
+ * try {
+ *   await api.get("/resource");
+ * } catch (error) {
+ *   if (error instanceof HttpError) {
+ *     console.log(error.status);     // e.g., 404
+ *     console.log(error.statusText); // e.g., "Not Found"
+ *     console.log(error.body);       // Response body
+ *   }
+ * }
+ * ```
  */
 class HttpError extends Error {
 	public override name = 'HttpError';
@@ -13,107 +34,121 @@ class HttpError extends Error {
 	public body: any = null;
 }
 
-// some more specific instances of the well known ones...
+// Client error classes (4xx)
 
-// client
-
+/** HTTP 400 Bad Request error. */
 class BadRequest extends HttpError {
 	public override name = 'HttpBadRequestError';
 	public override status = HTTP_STATUS.ERROR_CLIENT.BAD_REQUEST.CODE;
 	public override statusText = HTTP_STATUS.ERROR_CLIENT.BAD_REQUEST.TEXT;
 }
 
+/** HTTP 401 Unauthorized error. */
 class Unauthorized extends HttpError {
 	public override name = 'HttpUnauthorizedError';
 	public override status = HTTP_STATUS.ERROR_CLIENT.UNAUTHORIZED.CODE;
 	public override statusText = HTTP_STATUS.ERROR_CLIENT.UNAUTHORIZED.TEXT;
 }
 
+/** HTTP 403 Forbidden error. */
 class Forbidden extends HttpError {
 	public override name = 'HttpForbiddenError';
 	public override status = HTTP_STATUS.ERROR_CLIENT.FORBIDDEN.CODE;
 	public override statusText = HTTP_STATUS.ERROR_CLIENT.FORBIDDEN.TEXT;
 }
 
+/** HTTP 404 Not Found error. */
 class NotFound extends HttpError {
 	public override name = 'HttpNotFoundError';
 	public override status = HTTP_STATUS.ERROR_CLIENT.NOT_FOUND.CODE;
 	public override statusText = HTTP_STATUS.ERROR_CLIENT.NOT_FOUND.TEXT;
 }
 
+/** HTTP 405 Method Not Allowed error. */
 class MethodNotAllowed extends HttpError {
 	public override name = 'HttpMethodNotAllowedError';
 	public override status = HTTP_STATUS.ERROR_CLIENT.METHOD_NOT_ALLOWED.CODE;
 	public override statusText = HTTP_STATUS.ERROR_CLIENT.METHOD_NOT_ALLOWED.TEXT;
 }
 
+/** HTTP 408 Request Timeout error. */
 class RequestTimeout extends HttpError {
 	public override name = 'HttpRequestTimeoutError';
 	public override status = HTTP_STATUS.ERROR_CLIENT.REQUEST_TIMEOUT.CODE;
 	public override statusText = HTTP_STATUS.ERROR_CLIENT.REQUEST_TIMEOUT.TEXT;
 }
 
+/** HTTP 409 Conflict error. */
 class Conflict extends HttpError {
 	public override name = 'HttpConflictError';
 	public override status = HTTP_STATUS.ERROR_CLIENT.CONFLICT.CODE;
 	public override statusText = HTTP_STATUS.ERROR_CLIENT.CONFLICT.TEXT;
 }
 
+/** HTTP 410 Gone error. */
 class Gone extends HttpError {
 	public override name = 'HttpGoneError';
 	public override status = HTTP_STATUS.ERROR_CLIENT.GONE.CODE;
 	public override statusText = HTTP_STATUS.ERROR_CLIENT.GONE.TEXT;
 }
 
+/** HTTP 411 Length Required error. */
 class LengthRequired extends HttpError {
 	public override name = 'HttpLengthRequiredError';
 	public override status = HTTP_STATUS.ERROR_CLIENT.LENGTH_REQUIRED.CODE;
 	public override statusText = HTTP_STATUS.ERROR_CLIENT.LENGTH_REQUIRED.TEXT;
 }
 
+/** HTTP 422 Unprocessable Content error. */
 class UnprocessableContent extends HttpError {
 	public override name = 'HttpUnprocessableContentError';
 	public override status = HTTP_STATUS.ERROR_CLIENT.UNPROCESSABLE_CONTENT.CODE;
 	public override statusText = HTTP_STATUS.ERROR_CLIENT.UNPROCESSABLE_CONTENT.TEXT;
 }
 
+/** HTTP 429 Too Many Requests error. */
 class TooManyRequests extends HttpError {
 	public override name = 'HttpTooManyRequestsError';
 	public override status = HTTP_STATUS.ERROR_CLIENT.TOO_MANY_REQUESTS.CODE;
 	public override statusText = HTTP_STATUS.ERROR_CLIENT.TOO_MANY_REQUESTS.TEXT;
 }
 
+/** HTTP 418 I'm a Teapot error. */
 class ImATeapot extends HttpError {
 	public override name = 'HttpImATeapotError';
 	public override status = HTTP_STATUS.ERROR_CLIENT.IM_A_TEAPOT.CODE;
 	public override statusText = HTTP_STATUS.ERROR_CLIENT.IM_A_TEAPOT.TEXT;
 }
 
-// server
+// Server error classes (5xx)
 
+/** HTTP 500 Internal Server Error. */
 class InternalServerError extends HttpError {
 	public override name = 'HttpInternalServerError';
 }
 
+/** HTTP 501 Not Implemented error. */
 class NotImplemented extends HttpError {
-	public override name = 'HttpServiceUnavailableError';
+	public override name = 'HttpNotImplementedError';
 	public override status = HTTP_STATUS.ERROR_SERVER.NOT_IMPLEMENTED.CODE;
 	public override statusText = HTTP_STATUS.ERROR_SERVER.NOT_IMPLEMENTED.TEXT;
 }
 
+/** HTTP 502 Bad Gateway error. */
 class BadGateway extends HttpError {
 	public override name = 'HttpBadGatewayError';
 	public override status = HTTP_STATUS.ERROR_SERVER.BAD_GATEWAY.CODE;
 	public override statusText = HTTP_STATUS.ERROR_SERVER.BAD_GATEWAY.TEXT;
 }
 
+/** HTTP 503 Service Unavailable error. */
 class ServiceUnavailable extends HttpError {
 	public override name = 'HttpServiceUnavailableError';
 	public override status = HTTP_STATUS.ERROR_SERVER.SERVICE_UNAVAILABLE.CODE;
 	public override statusText = HTTP_STATUS.ERROR_SERVER.SERVICE_UNAVAILABLE.TEXT;
 }
 
-// Export individual error classes
+// Export individual error classes for direct imports
 export {
 	HttpError,
 	// Client errors
@@ -136,7 +171,25 @@ export {
 	ServiceUnavailable,
 };
 
-// Namespace export for convenience
+/**
+ * Namespace containing all HTTP error classes for convenient access.
+ *
+ * @example
+ * ```ts
+ * import { HTTP_ERROR } from "@marianmeres/http-utils";
+ *
+ * try {
+ *   await api.get("/resource");
+ * } catch (error) {
+ *   if (error instanceof HTTP_ERROR.NotFound) {
+ *     console.log("Resource not found");
+ *   }
+ *   if (error instanceof HTTP_ERROR.HttpError) {
+ *     console.log("HTTP error:", error.status);
+ *   }
+ * }
+ * ```
+ */
 export const HTTP_ERROR = {
 	// base
 	HttpError,

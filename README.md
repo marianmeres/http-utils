@@ -2,6 +2,7 @@
 
 [![NPM version](https://img.shields.io/npm/v/@marianmeres/http-utils)](https://www.npmjs.com/package/@marianmeres/http-utils)
 [![JSR version](https://jsr.io/badges/@marianmeres/http-utils)](https://jsr.io/@marianmeres/http-utils)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Opinionated, lightweight HTTP client wrapper for `fetch` with type-safe errors and convenient defaults.
 
@@ -67,186 +68,69 @@ try {
 }
 ```
 
-## API Reference
+## API Overview
 
 ### `createHttpApi(base?, defaults?, errorExtractor?)`
 
 Creates an HTTP API client.
 
-**Parameters:**
-- `base` - Optional base URL for all requests
-- `defaults` - Optional default params (headers, credentials, etc.) or async function returning defaults
-- `errorExtractor` - Optional global error message extractor function
-
-**Returns:** Object with methods: `get`, `post`, `put`, `patch`, `del`, `url`, `base`
+```ts
+const api = createHttpApi("https://api.example.com", {
+  headers: { "Authorization": "Bearer token" }
+});
+```
 
 ### HTTP Methods
 
-All methods return the parsed response body (JSON if possible) or throw `HttpError` on failure.
-
-**New Options API (recommended):**
 ```ts
-// GET with options
-await api.get(path, {
-  params?: { headers?, signal?, credentials?, raw?, assert?, token? },
-  respHeaders?: {},
-  errorExtractor?: (body, response) => string
+// GET (new options API)
+const data = await api.get("/users", {
+  params: { headers: { "X-Custom": "value" } },
+  respHeaders: {}
 });
 
-// POST/PUT/PATCH/DELETE with options
-await api.post(path, {
-  data?: any,  // Request body
-  params?: { headers?, signal?, credentials?, raw?, assert?, token? },
-  respHeaders?: {},
-  errorExtractor?: (body, response) => string
+// POST/PUT/PATCH/DELETE (new options API)
+await api.post("/users", {
+  data: { name: "John" },
+  params: { token: "bearer-token" }
 });
+
+// Legacy API still supported
+const data = await api.get("/users", { headers: { "X-Custom": "value" } });
+await api.post("/users", { name: "John" });
 ```
 
-**Legacy API (still supported):**
-```ts
-// GET
-await api.get(path, params?, respHeaders?, errorExtractor?)
-
-// POST, PUT, PATCH, DELETE
-await api.post(path, data?, params?, respHeaders?, errorExtractor?)
-```
-
-**Common params:**
-- `headers` - Custom headers object
-- `token` - Bearer token (auto-adds `Authorization: Bearer {token}`)
-- `signal` - AbortSignal for cancellation
-- `credentials` - `'omit' | 'same-origin' | 'include'`
-- `raw` - Return raw Response object instead of parsed body
-- `assert` - Set to `false` to disable throwing on errors
-
-### Response Headers
-
-Access response headers by passing a respHeaders object:
+### Error Handling
 
 ```ts
-// New API
-const headers = {};
-const data = await api.get("/users", { respHeaders: headers });
+import { HTTP_ERROR, NotFound } from "@marianmeres/http-utils";
 
-console.log(headers.__http_status_code__); // 200
-console.log(headers["content-type"]);      // "application/json"
-
-// Legacy API
-const legacyHeaders = {};
-const data2 = await api.get("/users", {}, legacyHeaders);
-```
-
-### Error Classes
-
-Well-known HTTP errors have specific classes:
-
-**Client Errors (4xx):**
-- `BadRequest` (400)
-- `Unauthorized` (401)
-- `Forbidden` (403)
-- `NotFound` (404)
-- `MethodNotAllowed` (405)
-- `RequestTimeout` (408)
-- `Conflict` (409)
-- `Gone` (410)
-- `LengthRequired` (411)
-- `ImATeapot` (418)
-- `UnprocessableContent` (422)
-- `TooManyRequests` (429)
-
-**Server Errors (5xx):**
-- `InternalServerError` (500)
-- `NotImplemented` (501)
-- `BadGateway` (502)
-- `ServiceUnavailable` (503)
-
-All errors extend `HttpError` with properties:
-- `status` - HTTP status code
-- `statusText` - HTTP status text
-- `body` - Response body (auto-parsed as JSON if possible)
-- `cause` - Error details/context
-
-### HTTP Status Codes
-
-Access status codes via `HTTP_STATUS`:
-
-```ts
-import { HTTP_STATUS } from "@marianmeres/http-utils";
-
-// By category
-HTTP_STATUS.SUCCESS.OK.CODE          // 200
-HTTP_STATUS.ERROR_CLIENT.NOT_FOUND.CODE  // 404
-
-// Direct shortcuts
-HTTP_STATUS.OK              // 200
-HTTP_STATUS.NOT_FOUND       // 404
-HTTP_STATUS.INTERNAL_SERVER_ERROR  // 500
-
-// Lookup by code
-const info = HTTP_STATUS.findByCode(404);
-// { CODE: 404, TEXT: "Not Found", _TYPE: "ERROR_CLIENT", _KEY: "NOT_FOUND" }
-```
-
-## Advanced Usage
-
-### Error Message Extraction
-
-Customize how error messages are extracted from failed responses:
-
-```ts
-// Global default
-createHttpApi.defaultErrorMessageExtractor = (body, response) => {
-  return body.error?.message || response.statusText;
-};
-
-// Per-instance
-const api = createHttpApi(null, null, (body) => body.customError);
-
-// Per-request
-await api.get("/path", null, null, (body) => body.message);
-```
-
-Priority: per-request → per-instance → global → built-in fallback
-
-### Dynamic Configuration
-
-```ts
-const api = createHttpApi("https://api.example.com", async () => {
-  const token = await getToken(); // Fetch fresh token
-  return { headers: { "Authorization": `Bearer ${token}` } };
-});
-```
-
-### Raw Response Access
-
-```ts
-const response = await api.get("/users", { raw: true });
-console.log(response instanceof Response); // true
-const data = await response.json();
-```
-
-### Non-Throwing Errors
-
-```ts
-const data = await api.get("/might-fail", { assert: false });
-if (data.error) {
-  console.log("Request failed:", data.error.message);
+try {
+  await api.get("/resource");
+} catch (error) {
+  if (error instanceof NotFound) {
+    console.log("Not found:", error.body);
+  }
+  // All errors have: status, statusText, body, cause
 }
 ```
 
-### AbortController Support
+### Key Features
 
-```ts
-const controller = new AbortController();
+- **Auto JSON**: Response bodies are automatically parsed as JSON
+- **Bearer tokens**: Use `token` param to auto-add `Authorization: Bearer` header
+- **Response headers**: Pass `respHeaders: {}` to capture response headers
+- **Raw response**: Use `raw: true` to get the raw Response object
+- **Non-throwing**: Use `assert: false` to prevent throwing on errors
+- **AbortController**: Pass `signal` for request cancellation
 
-setTimeout(() => controller.abort(), 5000);
+## Full API Reference
 
-await api.get("/slow-endpoint", { signal: controller.signal });
-```
+For complete API documentation including all error classes, HTTP status codes, types, and utilities, see **[API.md](API.md)**.
 
 ## Utilities
 
-### `getErrorMessage(error, stripErrorPrefix?)`
+### `getErrorMessage(error)`
 
 Extracts human-readable messages from any error format:
 
@@ -268,12 +152,5 @@ Manually create HTTP errors:
 import { createHttpError } from "@marianmeres/http-utils";
 
 const error = createHttpError(404, "User not found", { userId: 123 });
-throw error;
+throw error; // instanceof NotFound
 ```
-
-## Package Identity
-
-- **Name:** @marianmeres/http-utils
-- **Author:** Marian Meres
-- **Repository:** https://github.com/marianmeres/http-utils
-- **License:** MIT

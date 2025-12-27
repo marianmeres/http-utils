@@ -1,7 +1,11 @@
-import { createHttpError } from './error.ts';
+/**
+ * @module api
+ *
+ * HTTP API client factory and related types.
+ * Provides a convenient wrapper over the native `fetch` API with sensible defaults.
+ */
 
-// This is an opinionated HTTP client wrapper and may not be suitable for every use case.
-// It provides convenient defaults over plain fetch calls without adding unnecessary abstractions.
+import { createHttpError } from './error.ts';
 
 /**
  * Deep merges two objects. Later properties overwrite earlier properties.
@@ -35,38 +39,67 @@ interface BaseParams {
 	path: string;
 }
 
-interface FetchParams {
+/**
+ * Parameters for fetch requests.
+ */
+export interface FetchParams {
+	/** Request body data (automatically JSON stringified unless FormData). */
 	data?: any;
+	/** Bearer token (auto-adds `Authorization: Bearer {token}` header). */
 	token?: string | null;
+	/** Custom request headers. */
 	headers?: Record<string, string> | null;
+	/** AbortSignal for request cancellation. */
 	signal?: AbortSignal;
+	/** Credentials mode for the request. */
 	credentials?: 'omit' | 'same-origin' | 'include' | null;
+	/** If true, returns the raw Response object instead of parsed body. */
 	raw?: boolean | null;
+	/** If false, does not throw on HTTP errors (default: true). */
 	assert?: boolean | null;
 }
 
 type BaseFetchParams = BaseParams & FetchParams;
 
-type ErrorMessageExtractor = (body: any, response: Response) => string;
-
-type ResponseHeaders = Record<string, string | number>;
+/**
+ * Function to extract error messages from failed HTTP responses.
+ * @param body - The parsed response body.
+ * @param response - The raw Response object.
+ * @returns A human-readable error message string.
+ */
+export type ErrorMessageExtractor = (body: any, response: Response) => string;
 
 /**
- * Options for HTTP GET requests (new cleaner API).
+ * Object to receive response headers after a request completes.
+ * Will be mutated to include all response headers plus special keys:
+ * - `__http_status_code__`: The HTTP status code
+ * - `__http_status_text__`: The HTTP status text
+ */
+export type ResponseHeaders = Record<string, string | number>;
+
+/**
+ * Options for HTTP GET requests using the new cleaner API.
  */
 export interface GetOptions {
+	/** Fetch parameters (headers, token, signal, credentials, raw, assert). */
 	params?: FetchParams;
+	/** Object to receive response headers (will be mutated). */
 	respHeaders?: ResponseHeaders | null;
+	/** Custom error message extractor for this request. */
 	errorExtractor?: ErrorMessageExtractor | null;
 }
 
 /**
- * Options for HTTP POST/PUT/PATCH/DELETE requests (new cleaner API).
+ * Options for HTTP POST/PUT/PATCH/DELETE requests using the new cleaner API.
  */
 export interface DataOptions {
+	/** Request body data. */
 	data?: any;
+	/** Fetch parameters (headers, token, signal, credentials, raw, assert). */
 	params?: FetchParams;
+	/** Object to receive response headers (will be mutated). */
 	respHeaders?: ResponseHeaders | null;
+	/** Custom error message extractor for this request. */
 	errorExtractor?: ErrorMessageExtractor | null;
 }
 
@@ -581,6 +614,18 @@ export function createHttpApi(
 	return new HttpApi(base, defaults, factoryErrorMessageExtractor);
 }
 
+/**
+ * Global default error message extractor.
+ * Applied to all requests unless overridden at instance or request level.
+ * Priority: per-request → per-instance → global → built-in fallback.
+ *
+ * @example
+ * ```ts
+ * createHttpApi.defaultErrorMessageExtractor = (body, response) => {
+ *   return body?.error?.message || response.statusText;
+ * };
+ * ```
+ */
 createHttpApi.defaultErrorMessageExtractor = null as
 	| ErrorMessageExtractor
 	| null
