@@ -336,6 +336,14 @@ export class HttpApi {
 		this.#base = base;
 		this.#defaults = defaults;
 		this.#factoryErrorMessageExtractor = factoryErrorMessageExtractor;
+
+		// Bind methods for destructuring support
+		this.get = this.get.bind(this);
+		this.post = this.post.bind(this);
+		this.put = this.put.bind(this);
+		this.patch = this.patch.bind(this);
+		this.del = this.del.bind(this);
+		this.url = this.url.bind(this);
 	}
 
 	#merge<T = unknown>(a: Record<string, unknown>, b: Record<string, unknown>): T {
