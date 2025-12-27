@@ -26,38 +26,38 @@ npm install @marianmeres/http-utils
 ```
 
 ```ts
-import { createHttpApi, HTTP_ERROR } from "@marianmeres/http-utils";
+import { createHttpApi, opts, HTTP_ERROR } from "@marianmeres/http-utils";
 ```
 
 ## Quick Start
 
 ```ts
-import { createHttpApi, HTTP_ERROR, NotFound } from "@marianmeres/http-utils";
+import { createHttpApi, opts, HTTP_ERROR, NotFound } from "@marianmeres/http-utils";
 
 // Create an API client with base URL
 const api = createHttpApi("https://api.example.com", {
   headers: { "Authorization": "Bearer your-token" }
 });
 
-// GET request (new options API - recommended)
-const users = await api.get("/users", {
+// GET request (options API with opts() wrapper)
+const users = await api.get("/users", opts({
   params: { headers: { "X-Custom": "value" } }
-});
+}));
 
-// POST request (new options API - recommended)
-const newUser = await api.post("/users", {
+// POST request (options API with opts() wrapper)
+const newUser = await api.post("/users", opts({
   data: { name: "John Doe" },
   params: { headers: { "X-Custom": "value" } }
-});
+}));
 
-// Legacy API still works
+// Legacy API (default behavior without opts())
 const legacyUsers = await api.get("/users", { headers: { "X-Custom": "value" } });
 const legacyUser = await api.post("/users", { name: "John Doe" });
 
 // With type parameters for typed responses
 interface User { id: number; name: string; }
 const user = await api.get<User>("/users/1");
-const created = await api.post<User>("/users", { data: { name: "Jane" } });
+const created = await api.post<User>("/users", opts({ data: { name: "Jane" } }));
 
 // Error handling
 try {
@@ -89,22 +89,36 @@ const api = createHttpApi("https://api.example.com", {
 ### HTTP Methods
 
 ```ts
-// GET (new options API)
-const data = await api.get("/users", {
+// GET (options API with opts() wrapper)
+const data = await api.get("/users", opts({
   params: { headers: { "X-Custom": "value" } },
   respHeaders: {}
-});
+}));
 
-// POST/PUT/PATCH/DELETE (new options API)
-await api.post("/users", {
+// POST/PUT/PATCH/DELETE (options API with opts() wrapper)
+await api.post("/users", opts({
   data: { name: "John" },
   params: { token: "bearer-token" }
-});
+}));
 
-// Legacy API still supported
+// Legacy API (default behavior without opts())
 const data = await api.get("/users", { headers: { "X-Custom": "value" } });
 await api.post("/users", { name: "John" });
 ```
+
+### The `opts()` Helper
+
+The `opts()` function explicitly marks an options object for the options-based API. Without it, arguments are treated as legacy positional parameters.
+
+```ts
+// Without opts() - legacy behavior: object is sent as request body
+await api.post("/users", { data: { name: "John" } });  // Sends: { data: { name: "John" } }
+
+// With opts() - options API: data is extracted and sent as body
+await api.post("/users", opts({ data: { name: "John" } }));  // Sends: { name: "John" }
+```
+
+This makes the API unambiguous and prevents accidental misinterpretation of request data.
 
 ### Error Handling
 

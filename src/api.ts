@@ -111,6 +111,26 @@ export interface DataOptions {
 	errorExtractor?: ErrorMessageExtractor | null;
 }
 
+/** Symbol marker for explicit options API detection. */
+const OPTIONS_MARKER = Symbol('options');
+
+/**
+ * Marks an options object for the new options API.
+ * Use this to explicitly indicate you're using the options-based API.
+ *
+ * @example
+ * ```ts
+ * // GET with options
+ * await api.get('/users', opts({ params: { token: 'abc' } }));
+ *
+ * // POST with options
+ * await api.post('/users', opts({ data: { name: 'John' }, params: { token: 'abc' } }));
+ * ```
+ */
+export function opts<T extends GetOptions | DataOptions>(options: T): T {
+	return Object.assign(options, { [OPTIONS_MARKER]: true });
+}
+
 // Internal parsed options types
 interface ParsedGetOptions {
 	params: FetchParams | undefined;
@@ -126,20 +146,20 @@ interface ParsedDataOptions {
 }
 
 /**
- * Parses GET method arguments, detecting new options API vs legacy positional API.
+ * Parses GET method arguments, detecting new options API via OPTIONS_MARKER.
  */
 function parseGetOptions(
 	paramsOrOptions: FetchParams | GetOptions | undefined,
 	legacyRespHeaders?: ResponseHeaders | null,
 	legacyErrorExtractor?: ErrorMessageExtractor | null
 ): ParsedGetOptions {
-	if (paramsOrOptions && ('respHeaders' in paramsOrOptions || 'errorExtractor' in paramsOrOptions)) {
-		// New options API
-		const opts = paramsOrOptions as GetOptions;
+	if (paramsOrOptions && OPTIONS_MARKER in paramsOrOptions) {
+		// New options API (explicit via opts() wrapper)
+		const o = paramsOrOptions as GetOptions;
 		return {
-			params: opts.params,
-			respHeaders: opts.respHeaders ?? null,
-			errorExtractor: opts.errorExtractor ?? null,
+			params: o.params,
+			respHeaders: o.respHeaders ?? null,
+			errorExtractor: o.errorExtractor ?? null,
 		};
 	}
 	// Legacy positional API
@@ -151,7 +171,7 @@ function parseGetOptions(
 }
 
 /**
- * Parses body method arguments (POST/PUT/PATCH/DELETE), detecting new options API vs legacy positional API.
+ * Parses body method arguments (POST/PUT/PATCH/DELETE), detecting new options API via OPTIONS_MARKER.
  */
 function parseDataOptions(
 	dataOrOptions: RequestData | DataOptions | undefined,
@@ -162,19 +182,15 @@ function parseDataOptions(
 	if (
 		dataOrOptions &&
 		typeof dataOrOptions === 'object' &&
-		!(dataOrOptions instanceof FormData) &&
-		('data' in dataOrOptions ||
-			'params' in dataOrOptions ||
-			'respHeaders' in dataOrOptions ||
-			'errorExtractor' in dataOrOptions)
+		OPTIONS_MARKER in dataOrOptions
 	) {
-		// New options API
-		const opts = dataOrOptions as DataOptions;
+		// New options API (explicit via opts() wrapper)
+		const o = dataOrOptions as DataOptions;
 		return {
-			data: opts.data ?? null,
-			params: opts.params,
-			respHeaders: opts.respHeaders ?? null,
-			errorExtractor: opts.errorExtractor ?? null,
+			data: o.data ?? null,
+			params: o.params,
+			respHeaders: o.respHeaders ?? null,
+			errorExtractor: o.errorExtractor ?? null,
 		};
 	}
 	// Legacy positional API

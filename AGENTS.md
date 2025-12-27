@@ -103,6 +103,13 @@ HTTP_ERROR.BadGateway       // 502
 HTTP_ERROR.ServiceUnavailable // 503
 ```
 
+### Helper Functions
+
+```typescript
+// Marks options object for options-based API (vs legacy positional API)
+function opts<T extends GetOptions | DataOptions>(options: T): T
+```
+
 ### Utility Functions
 
 ```typescript
@@ -168,12 +175,18 @@ deno task publish     # Publish to JSR and NPM
 ### Basic Usage
 
 ```typescript
+import { createHttpApi, opts } from "@marianmeres/http-utils";
+
 const api = createHttpApi("https://api.example.com", {
   headers: { "Authorization": "Bearer token" }
 });
 
+// Legacy API (default - object is request body)
 const data = await api.get("/users");
-await api.post("/users", { data: { name: "John" } });
+await api.post("/users", { name: "John" });
+
+// Options API (requires opts() wrapper)
+await api.post("/users", opts({ data: { name: "John" }, params: { token: "abc" } }));
 ```
 
 ### Error Handling

@@ -25,6 +25,7 @@
 export {
 	HttpApi,
 	createHttpApi,
+	opts,
 	type DataOptions,
 	type GetOptions,
 	type FetchParams,

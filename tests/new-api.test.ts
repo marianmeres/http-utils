@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "@std/assert";
-import { createHttpApi } from "../src/mod.ts";
+import { createHttpApi, opts } from "../src/mod.ts";
 import { getAvailablePort, hostname } from "./_helpers.ts";
 
 // Test server setup
@@ -49,11 +49,11 @@ Deno.test("new API: GET with options object", async () => {
 	const api = createHttpApi(url);
 	const respHeaders: Record<string, string | number> = {};
 
-	// New API style
-	const data = (await api.get("/echo", {
+	// New API style - requires opts() wrapper
+	const data = (await api.get("/echo", opts({
 		params: { headers: { "x-custom": "test-value" } },
 		respHeaders,
-	})) as Record<string, unknown>;
+	}))) as Record<string, unknown>;
 
 	assertEquals(data.message, "GET response");
 	assertEquals(respHeaders.__http_status_code__, 200);
@@ -64,12 +64,12 @@ Deno.test("new API: POST with options object", async () => {
 	const api = createHttpApi(url);
 	const respHeaders: Record<string, string | number> = {};
 
-	// New API style
-	const data = (await api.post("/echo", {
+	// New API style - requires opts() wrapper
+	const data = (await api.post("/echo", opts({
 		data: { name: "John", age: 30 },
 		params: { headers: { "x-custom": "post-test" } },
 		respHeaders,
-	})) as Record<string, unknown>;
+	}))) as Record<string, unknown>;
 
 	assertEquals(data.name, "John");
 	assertEquals(data.age, 30);
@@ -80,10 +80,10 @@ Deno.test("new API: POST with options object", async () => {
 Deno.test("new API: GET with minimal options", async () => {
 	const api = createHttpApi(url);
 
-	// Just params, no respHeaders
-	const data = (await api.get("/echo", {
+	// Just params, no respHeaders - requires opts() wrapper
+	const data = (await api.get("/echo", opts({
 		params: { raw: false },
-	})) as Record<string, unknown>;
+	}))) as Record<string, unknown>;
 
 	assertEquals(data.message, "GET response");
 });
@@ -91,10 +91,10 @@ Deno.test("new API: GET with minimal options", async () => {
 Deno.test("new API: POST without data field (should work)", async () => {
 	const api = createHttpApi(url);
 
-	// Options object without data field (data will be null)
-	const data = await api.post("/echo", {
+	// Options object without data field (data will be null) - requires opts() wrapper
+	const data = await api.post("/echo", opts({
 		params: { headers: { "x-custom": "no-data" } },
-	});
+	}));
 
 	// Server echoes empty body (JSON.stringify(null) = "null", but empty body might be "")
 	// Just verify it doesn't crash

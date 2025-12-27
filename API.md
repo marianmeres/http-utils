@@ -5,6 +5,7 @@ Complete API reference for `@marianmeres/http-utils`.
 ## Table of Contents
 
 - [createHttpApi](#createhttpapi)
+- [opts](#opts)
 - [HttpApi Class](#httpapi-class)
 - [Types](#types)
 - [HTTP Errors](#http-errors)
@@ -78,6 +79,47 @@ Priority order: per-request > per-instance > global > built-in fallback.
 
 ---
 
+## opts
+
+Marks an options object for the options-based API. Without this wrapper, arguments are treated as legacy positional parameters.
+
+```ts
+function opts<T extends GetOptions | DataOptions>(options: T): T
+```
+
+### Why `opts()`?
+
+The library supports two API styles:
+- **Legacy API**: Positional parameters (backward compatible)
+- **Options API**: Single options object with named properties
+
+The `opts()` wrapper explicitly indicates which style you're using, preventing ambiguity when your request data might look like an options object.
+
+### Example
+
+```ts
+import { createHttpApi, opts } from "@marianmeres/http-utils";
+
+const api = createHttpApi("https://api.example.com");
+
+// Without opts() - legacy behavior: entire object is sent as request body
+await api.post("/users", { data: { name: "John" } });
+// Sends: { "data": { "name": "John" } }
+
+// With opts() - options API: data is extracted and sent as body
+await api.post("/users", opts({ data: { name: "John" } }));
+// Sends: { "name": "John" }
+
+// GET with options
+const respHeaders = {};
+await api.get("/users", opts({
+  params: { headers: { "X-Custom": "value" } },
+  respHeaders
+}));
+```
+
+---
+
 ## HttpApi Class
 
 HTTP API client class. Usually created via `createHttpApi()`.
@@ -88,12 +130,12 @@ HTTP API client class. Usually created via `createHttpApi()`.
 
 Performs a GET request.
 
-**New Options API (recommended):**
+**Options API (with `opts()` wrapper):**
 ```ts
 async get<T = unknown>(path: string, options?: GetOptions): Promise<T>
 ```
 
-**Legacy API:**
+**Legacy API (default behavior):**
 ```ts
 async get<T = unknown>(
   path: string,
@@ -105,17 +147,17 @@ async get<T = unknown>(
 
 **Example:**
 ```ts
-// New API with type parameter
+// Options API with type parameter (requires opts() wrapper)
 interface User { id: number; name: string; }
-const user = await api.get<User>("/users/1", {
+const user = await api.get<User>("/users/1", opts({
   params: { headers: { "X-Custom": "value" } },
   respHeaders: {}
-});
+}));
 
 // Without type parameter (returns unknown)
 const data = await api.get("/users");
 
-// Legacy API
+// Legacy API (no opts() needed)
 const data = await api.get("/users", { headers: { "X-Custom": "value" } });
 ```
 
@@ -123,12 +165,12 @@ const data = await api.get("/users", { headers: { "X-Custom": "value" } });
 
 Performs a POST request.
 
-**New Options API (recommended):**
+**Options API (with `opts()` wrapper):**
 ```ts
 async post<T = unknown>(path: string, options?: DataOptions): Promise<T>
 ```
 
-**Legacy API:**
+**Legacy API (default behavior):**
 ```ts
 async post<T = unknown>(
   path: string,
@@ -141,14 +183,14 @@ async post<T = unknown>(
 
 **Example:**
 ```ts
-// New API with type parameter
+// Options API with type parameter (requires opts() wrapper)
 interface User { id: number; name: string; }
-const user = await api.post<User>("/users", {
+const user = await api.post<User>("/users", opts({
   data: { name: "John" },
   params: { headers: { "X-Custom": "value" } }
-});
+}));
 
-// Legacy API
+// Legacy API (no opts() needed)
 const result = await api.post("/users", { name: "John" });
 ```
 
