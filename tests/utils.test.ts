@@ -35,8 +35,8 @@ Deno.test("createHttpErrorByCode", () => {
 
 	assert(e instanceof HTTP_ERROR.NotFound);
 	assert(e.toString() === "HttpNotFoundError: Not Found");
-	assert(e.body.foo === "bar");
-	assert((e.cause as any).baz === "bat");
+	assert((e.body as Record<string, unknown>).foo === "bar");
+	assert((e.cause as Record<string, unknown>).baz === "bat");
 
 	// NOT well known
 	e = createHttpError(423, null, "{invalid json}", "{invalid json2}");

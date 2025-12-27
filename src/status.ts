@@ -164,11 +164,13 @@ export class HTTP_STATUS {
 	static findByCode(
 		code: number | string
 	): { CODE: number; TEXT: string; _TYPE: string; _KEY: string } | null {
-		const keys: (keyof typeof HTTP_STATUS)[] = [
+		type StatusEntry = { CODE: number; TEXT: string };
+		const keys: ('INFO' | 'SUCCESS' | 'REDIRECT' | 'ERROR_CLIENT' | 'ERROR_SERVER')[] = [
 			'INFO', 'SUCCESS', 'REDIRECT', 'ERROR_CLIENT', 'ERROR_SERVER',
 		];
 		for (const _TYPE of keys) {
-			for (const [_KEY, data] of Object.entries(HTTP_STATUS[_TYPE]) as any) {
+			const entries = Object.entries(HTTP_STATUS[_TYPE]) as [string, StatusEntry][];
+			for (const [_KEY, data] of entries) {
 				if (data.CODE == code) {
 					return { ...data, _TYPE, _KEY };
 				}

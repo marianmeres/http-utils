@@ -1,18 +1,9 @@
 import { assert, assertEquals } from "@std/assert";
 import { createHttpApi, HTTP_ERROR } from "../src/mod.ts";
+import { getAvailablePort, hostname } from "./_helpers.ts";
 
-const hostname = "127.0.0.1";
 const CUSTOM_ERR_MSG = "this is custom error";
 
-// Helper to find available port
-async function getAvailablePort(): Promise<number> {
-	const listener = Deno.listen({ hostname, port: 0 });
-	const port = (listener.addr as Deno.NetAddr).port;
-	listener.close();
-	return port;
-}
-
-// Test server setup
 async function createTestServer(port: number): Promise<Deno.HttpServer> {
 	const handler = async (req: Request): Promise<Response> => {
 		const url = new URL(req.url);
@@ -40,6 +31,19 @@ async function createTestServer(port: number): Promise<Deno.HttpServer> {
 	return Deno.serve({ hostname, port, onListen: () => {} }, handler);
 }
 
+let url: string;
+let server: Deno.HttpServer;
+
+Deno.test.beforeEach(async () => {
+	const port = await getAvailablePort();
+	url = `http://${hostname}:${port}`;
+	server = await createTestServer(port);
+});
+
+Deno.test.afterEach(async () => {
+	await server.shutdown();
+});
+
 // Tests with isolated server instances
 Deno.test("createHttpApi GET", async () => {
 	const port = await getAvailablePort();
@@ -50,7 +54,7 @@ Deno.test("createHttpApi GET", async () => {
 		const api = createHttpApi();
 		const respHeaders: any = {};
 
-		const r = await api.get(`${url}/echo`, {}, respHeaders);
+		const r: any = await api.get(`${url}/echo`, {}, respHeaders);
 		assertEquals(r.foo, "bar");
 		assertEquals(respHeaders.__http_status_code__, 200);
 	} finally {
@@ -59,210 +63,141 @@ Deno.test("createHttpApi GET", async () => {
 });
 
 Deno.test("createHttpApi base option", async () => {
-	const port = await getAvailablePort();
-	const url = `http://${hostname}:${port}`;
-	const server = await createTestServer(port);
+	const api = createHttpApi(url);
+	const respHeaders: any = {};
 
-	try {
-		const api = createHttpApi(url);
-		const respHeaders: any = {};
-
-		const r = await api.get("/echo", {}, respHeaders);
-		assertEquals(r.foo, "bar");
-		assertEquals(respHeaders.__http_status_code__, 200);
-		assertEquals(api.base, url);
-	} finally {
-		await server.shutdown();
-	}
+	const r = (await api.get("/echo", {}, respHeaders)) as Record<
+		string,
+		unknown
+	>;
+	assertEquals(r.foo, "bar");
+	assertEquals(respHeaders.__http_status_code__, 200);
+	assertEquals(api.base, url);
 });
 
 Deno.test("createHttpApi RAW", async () => {
-	const port = await getAvailablePort();
-	const url = `http://${hostname}:${port}`;
-	const server = await createTestServer(port);
+	const api = createHttpApi();
 
-	try {
-		const api = createHttpApi();
+	// raw
+	const r = await api.get(`${url}/echo`, { raw: true });
+	assert(r instanceof Response);
+	await r.text(); // consume response body to prevent leak
 
-		// raw
-		const r = await api.get(`${url}/echo`, { raw: true });
-		assert(r instanceof Response);
-		await r.text(); // consume response body to prevent leak
-
-		// off-topic
-		assertEquals(api.base, undefined);
-		assertEquals(api.url("/foo"), "/foo");
-		api.base = url;
-		assertEquals(api.base, url);
-		assertEquals(api.url("/foo"), url + "/foo");
-	} finally {
-		await server.shutdown();
-	}
+	// off-topic
+	assertEquals(api.base, undefined);
+	assertEquals(api.url("/foo"), "/foo");
+	api.base = url;
+	assertEquals(api.base, url);
+	assertEquals(api.url("/foo"), url + "/foo");
 });
 
 Deno.test("createHttpApi error", async () => {
-	const port = await getAvailablePort();
-	const url = `http://${hostname}:${port}`;
-	const server = await createTestServer(port);
+	const api = createHttpApi();
 
 	try {
-		const api = createHttpApi();
-
-		try {
-			await api.get(`${url}/asdf`);
-			assert(false); // must not be reached
-		} catch (e) {
-			assert(e instanceof HTTP_ERROR.NotFound);
-			assertEquals((e as any).body.error.message, CUSTOM_ERR_MSG);
-			assertEquals((e as any).cause.response.headers.hey, "ho");
-		}
-	} finally {
-		await server.shutdown();
+		await api.get(`${url}/asdf`);
+		assert(false); // must not be reached
+	} catch (e) {
+		assert(e instanceof HTTP_ERROR.NotFound);
+		assertEquals((e as any).body.error.message, CUSTOM_ERR_MSG);
+		assertEquals((e as any).cause.response.headers.hey, "ho");
 	}
 });
 
 Deno.test("createHttpApi error { raw: true }", async () => {
-	const port = await getAvailablePort();
-	const url = `http://${hostname}:${port}`;
-	const server = await createTestServer(port);
+	const api = createHttpApi();
 
-	try {
-		const api = createHttpApi();
-
-		const r = await api.get(`${url}/asdf`, { raw: true });
-		assert(r instanceof Response);
-		assert(!r.ok);
-		await r.text(); // consume response body to prevent leak
-	} finally {
-		await server.shutdown();
-	}
+	const r = await api.get(`${url}/asdf`, { raw: true });
+	assert(r instanceof Response);
+	assert(!r.ok);
+	await r.text(); // consume response body to prevent leak
 });
 
 Deno.test("createHttpApi error { assert: false } does not throw", async () => {
-	const port = await getAvailablePort();
-	const url = `http://${hostname}:${port}`;
-	const server = await createTestServer(port);
+	const api = createHttpApi();
+	const respHeaders: any = {};
 
-	try {
-		const api = createHttpApi();
-		const respHeaders: any = {};
-
-		const r = await api.get(`${url}/asdf`, { assert: false }, respHeaders);
-		assertEquals(r.error.message, CUSTOM_ERR_MSG);
-		assertEquals(respHeaders.__http_status_code__, 404);
-	} finally {
-		await server.shutdown();
-	}
+	const r = (await api.get(
+		`${url}/asdf`,
+		{ assert: false },
+		respHeaders
+	)) as Record<string, unknown>;
+	assertEquals((r.error as Record<string, unknown>).message, CUSTOM_ERR_MSG);
+	assertEquals(respHeaders.__http_status_code__, 404);
 });
 
 Deno.test("custom local error message extractor", async () => {
-	const port = await getAvailablePort();
-	const url = `http://${hostname}:${port}`;
-	const server = await createTestServer(port);
+	const api = createHttpApi();
 
 	try {
-		const api = createHttpApi();
-
-		try {
-			await api.get(
-				`${url}/asdf`,
-				undefined,
-				undefined,
-				(body: any, _resp: Response) => {
-					return body.error.message.toUpperCase();
-				}
-			);
-			assert(false); // must not be reached
-		} catch (e) {
-			assert(e instanceof HTTP_ERROR.NotFound);
-			assertEquals((e as any).message, CUSTOM_ERR_MSG.toUpperCase());
-			assertEquals((e as any).body.error.message, CUSTOM_ERR_MSG);
-			assertEquals((e as any).cause.response.headers.hey, "ho");
-		}
-	} finally {
-		await server.shutdown();
-	}
-});
-
-Deno.test("custom factory error message extractor", async () => {
-	const port = await getAvailablePort();
-	const url = `http://${hostname}:${port}`;
-	const server = await createTestServer(port);
-
-	try {
-		const api = createHttpApi(
+		await api.get(
+			`${url}/asdf`,
 			undefined,
 			undefined,
 			(body: any, _resp: Response) => {
 				return body.error.message.toUpperCase();
 			}
 		);
+		assert(false); // must not be reached
+	} catch (e) {
+		assert(e instanceof HTTP_ERROR.NotFound);
+		assertEquals((e as any).message, CUSTOM_ERR_MSG.toUpperCase());
+		assertEquals((e as any).body.error.message, CUSTOM_ERR_MSG);
+		assertEquals((e as any).cause.response.headers.hey, "ho");
+	}
+});
 
-		try {
-			await api.get(`${url}/asdf`);
-			assert(false); // must not be reached
-		} catch (e) {
-			assert(e instanceof HTTP_ERROR.NotFound);
-			assertEquals((e as any).message, CUSTOM_ERR_MSG.toUpperCase());
-			assertEquals((e as any).body.error.message, CUSTOM_ERR_MSG);
-			assertEquals((e as any).cause.response.headers.hey, "ho");
+Deno.test("custom factory error message extractor", async () => {
+	const api = createHttpApi(
+		undefined,
+		undefined,
+		(body: any, _resp: Response) => {
+			return body.error.message.toUpperCase();
 		}
-	} finally {
-		await server.shutdown();
+	);
+
+	try {
+		await api.get(`${url}/asdf`);
+		assert(false); // must not be reached
+	} catch (e) {
+		assert(e instanceof HTTP_ERROR.NotFound);
+		assertEquals((e as any).message, CUSTOM_ERR_MSG.toUpperCase());
+		assertEquals((e as any).body.error.message, CUSTOM_ERR_MSG);
+		assertEquals((e as any).cause.response.headers.hey, "ho");
 	}
 });
 
 Deno.test("custom global error message extractor", async () => {
-	const port = await getAvailablePort();
-	const url = `http://${hostname}:${port}`;
-	const server = await createTestServer(port);
+	createHttpApi.defaultErrorMessageExtractor = (body: any, _resp: Response) => {
+		return body.error.message.toUpperCase();
+	};
+
+	const api = createHttpApi();
 
 	try {
-		createHttpApi.defaultErrorMessageExtractor = (
-			body: any,
-			_resp: Response
-		) => {
-			return body.error.message.toUpperCase();
-		};
-
-		const api = createHttpApi();
-
-		try {
-			await api.get(`${url}/asdf`);
-			assert(false); // must not be reached
-		} catch (e) {
-			assert(e instanceof HTTP_ERROR.NotFound);
-			assertEquals((e as any).message, CUSTOM_ERR_MSG.toUpperCase());
-			assertEquals((e as any).body.error.message, CUSTOM_ERR_MSG);
-			assertEquals((e as any).cause.response.headers.hey, "ho");
-		}
-	} finally {
-		createHttpApi.defaultErrorMessageExtractor = null;
-		await server.shutdown();
+		await api.get(`${url}/asdf`);
+		assert(false); // must not be reached
+	} catch (e) {
+		assert(e instanceof HTTP_ERROR.NotFound);
+		assertEquals((e as any).message, CUSTOM_ERR_MSG.toUpperCase());
+		assertEquals((e as any).body.error.message, CUSTOM_ERR_MSG);
+		assertEquals((e as any).cause.response.headers.hey, "ho");
 	}
 });
 
 Deno.test("createHttpApi POST", async () => {
-	const port = await getAvailablePort();
-	const url = `http://${hostname}:${port}`;
-	const server = await createTestServer(port);
+	const api = createHttpApi();
+	const respHeaders: any = {};
 
-	try {
-		const api = createHttpApi();
-		const respHeaders: any = {};
-
-		const r = await api.post(
-			`${url}/echo`,
-			{ hey: "ho" },
-			{ headers: { x: "yo" } },
-			respHeaders
-		);
-		assertEquals(r.hey, "ho");
-		assertEquals(respHeaders.__http_status_code__, 200);
-		assertEquals(respHeaders.x, "yo");
-	} finally {
-		await server.shutdown();
-	}
+	const r = (await api.post(
+		`${url}/echo`,
+		{ hey: "ho" },
+		{ headers: { x: "yo" } },
+		respHeaders
+	)) as Record<string, unknown>;
+	assertEquals(r.hey, "ho");
+	assertEquals(respHeaders.__http_status_code__, 200);
+	assertEquals(respHeaders.x, "yo");
 });
 
 Deno.test("createHttpApi merge default params", async () => {

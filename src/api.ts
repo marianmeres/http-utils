@@ -8,21 +8,29 @@
 import { createHttpError } from './error.ts';
 
 /**
+ * Request body data type.
+ * Supports JSON-serializable objects, FormData for file uploads, or raw strings.
+ */
+export type RequestData = Record<string, unknown> | FormData | string | null;
+
+/**
  * Deep merges two objects. Later properties overwrite earlier properties.
  */
-function deepMerge<T = any>(target: any, source: any): T {
+function deepMerge<T = unknown>(target: Record<string, unknown>, source: Record<string, unknown>): T {
 	const output = { ...target };
 
 	if (isObject(target) && isObject(source)) {
 		Object.keys(source).forEach(key => {
-			if (isObject(source[key])) {
-				if (!(key in target)) {
-					Object.assign(output, { [key]: source[key] });
+			const sourceVal = source[key];
+			const targetVal = target[key];
+			if (isObject(sourceVal)) {
+				if (!(key in target) || !isObject(targetVal)) {
+					Object.assign(output, { [key]: sourceVal });
 				} else {
-					output[key] = deepMerge(target[key], source[key]);
+					output[key] = deepMerge(targetVal, sourceVal);
 				}
 			} else {
-				Object.assign(output, { [key]: source[key] });
+				Object.assign(output, { [key]: sourceVal });
 			}
 		});
 	}
@@ -30,8 +38,8 @@ function deepMerge<T = any>(target: any, source: any): T {
 	return output as T;
 }
 
-function isObject(item: any): boolean {
-	return item && typeof item === 'object' && !Array.isArray(item);
+function isObject(item: unknown): item is Record<string, unknown> {
+	return item !== null && typeof item === 'object' && !Array.isArray(item);
 }
 
 interface BaseParams {
@@ -44,7 +52,7 @@ interface BaseParams {
  */
 export interface FetchParams {
 	/** Request body data (automatically JSON stringified unless FormData). */
-	data?: any;
+	data?: RequestData;
 	/** Bearer token (auto-adds `Authorization: Bearer {token}` header). */
 	token?: string | null;
 	/** Custom request headers. */
@@ -67,7 +75,7 @@ type BaseFetchParams = BaseParams & FetchParams;
  * @param response - The raw Response object.
  * @returns A human-readable error message string.
  */
-export type ErrorMessageExtractor = (body: any, response: Response) => string;
+export type ErrorMessageExtractor = (body: unknown, response: Response) => string;
 
 /**
  * Object to receive response headers after a request completes.
@@ -94,7 +102,7 @@ export interface GetOptions {
  */
 export interface DataOptions {
 	/** Request body data. */
-	data?: any;
+	data?: RequestData;
 	/** Fetch parameters (headers, token, signal, credentials, raw, assert). */
 	params?: FetchParams;
 	/** Object to receive response headers (will be mutated). */
@@ -177,9 +185,9 @@ const _fetch = async (
 		);
 	}
 
-	let body: any = await r.text();
+	let body: unknown = await r.text();
 	// prettier-ignore
-	try { body = JSON.parse(body); } catch (_e) { /* ignore parse errors */ }
+	try { body = JSON.parse(body as string); } catch (_e) { /* ignore parse errors */ }
 
 	params.assert ??= true; // default is true
 
@@ -190,14 +198,16 @@ const _fetch = async (
 			errorMessageExtractor ?? // provided arg
 			createHttpApi.defaultErrorMessageExtractor ?? // static default
 			// educated guess fallback
-			function (_body: any, _response: Response) {
-				let msg =
+			function (_body: unknown, _response: Response): string {
+				const b = _body as Record<string, unknown> | null;
+				let msg: string = String(
 					// try opinionated convention first
-					_body?.error?.message ||
-					_body?.message ||
-					_body?.error ||
+					(b?.error as Record<string, unknown>)?.message ||
+					b?.message ||
+					b?.error ||
 					_response?.statusText ||
-					'Unknown error';
+					'Unknown error'
+				);
 
 				if (msg.length > 255) msg = `[Shortened]: ${msg.slice(0, 255)}`;
 
@@ -237,7 +247,7 @@ export class HttpApi {
 		this.#factoryErrorMessageExtractor = factoryErrorMessageExtractor;
 	}
 
-	#merge<T = any>(a: any, b: any): T {
+	#merge<T = unknown>(a: Record<string, unknown>, b: Record<string, unknown>): T {
 		return deepMerge<T>(a, b);
 	}
 
@@ -270,7 +280,7 @@ export class HttpApi {
 	 * });
 	 * ```
 	 */
-	async get(path: string, options: GetOptions): Promise<any>;
+	async get(path: string, options: GetOptions): Promise<unknown>;
 
 	/**
 	 * Performs a GET request (legacy API).
@@ -289,7 +299,7 @@ export class HttpApi {
 		respHeaders?: ResponseHeaders | null,
 		errorMessageExtractor?: ErrorMessageExtractor | null,
 		_dumpParams?: boolean
-	): Promise<any>;
+	): Promise<unknown>;
 
 	async get(
 		path: string,
@@ -297,7 +307,7 @@ export class HttpApi {
 		respHeaders?: ResponseHeaders | null,
 		errorMessageExtractor?: ErrorMessageExtractor | null,
 		_dumpParams = false
-	): Promise<any> {
+	): Promise<unknown> {
 		// Detect which API is being used
 		let params: FetchParams | undefined;
 		let headers: ResponseHeaders | null = null;
@@ -342,7 +352,7 @@ export class HttpApi {
 	 * });
 	 * ```
 	 */
-	async post(path: string, options: DataOptions): Promise<any>;
+	async post(path: string, options: DataOptions): Promise<unknown>;
 
 	/**
 	 * Performs a POST request (legacy API).
@@ -358,33 +368,36 @@ export class HttpApi {
 	 */
 	async post(
 		path: string,
-		data?: any,
+		data?: RequestData,
 		params?: FetchParams,
 		respHeaders?: ResponseHeaders | null,
 		errorMessageExtractor?: ErrorMessageExtractor | null,
 		_dumpParams?: boolean
-	): Promise<any>;
+	): Promise<unknown>;
 
 	async post(
 		path: string,
-		dataOrOptions?: any | DataOptions,
+		dataOrOptions?: RequestData | DataOptions,
 		params?: FetchParams,
 		respHeaders?: ResponseHeaders | null,
 		errorMessageExtractor?: ErrorMessageExtractor | null,
 		_dumpParams = false
-	): Promise<any> {
+	): Promise<unknown> {
 		// Detect which API is being used
-		let data: any = null;
+		let data: RequestData = null;
 		let fetchParams: FetchParams | undefined;
 		let headers: ResponseHeaders | null = null;
 		let extractor: ErrorMessageExtractor | null | undefined = null;
 
-		if (dataOrOptions && (
-			'data' in dataOrOptions ||
-			'params' in dataOrOptions ||
-			'respHeaders' in dataOrOptions ||
-			'errorExtractor' in dataOrOptions
-		)) {
+		if (
+			dataOrOptions &&
+			typeof dataOrOptions === 'object' &&
+			!(dataOrOptions instanceof FormData) &&
+			('data' in dataOrOptions ||
+				'params' in dataOrOptions ||
+				'respHeaders' in dataOrOptions ||
+				'errorExtractor' in dataOrOptions)
+		) {
 			// New options API
 			const opts = dataOrOptions as DataOptions;
 			data = opts.data ?? null;
@@ -393,7 +406,7 @@ export class HttpApi {
 			extractor = opts.errorExtractor ?? null;
 		} else {
 			// Legacy positional API
-			data = dataOrOptions ?? null;
+			data = (dataOrOptions as RequestData) ?? null;
 			fetchParams = params;
 			headers = respHeaders ?? null;
 			extractor = errorMessageExtractor ?? null;
@@ -409,42 +422,45 @@ export class HttpApi {
 	}
 
 	/** Performs a PUT request (new options API). @see post */
-	async put(path: string, options: DataOptions): Promise<any>;
+	async put(path: string, options: DataOptions): Promise<unknown>;
 	/** Performs a PUT request (legacy API). @see post */
 	async put(
 		path: string,
-		data?: any,
+		data?: RequestData,
 		params?: FetchParams,
 		respHeaders?: ResponseHeaders | null,
 		errorMessageExtractor?: ErrorMessageExtractor | null,
 		_dumpParams?: boolean
-	): Promise<any>;
+	): Promise<unknown>;
 	async put(
 		path: string,
-		dataOrOptions?: any | DataOptions,
+		dataOrOptions?: RequestData | DataOptions,
 		params?: FetchParams,
 		respHeaders?: ResponseHeaders | null,
 		errorMessageExtractor?: ErrorMessageExtractor | null,
 		_dumpParams = false
-	): Promise<any> {
-		let data: any = null;
+	): Promise<unknown> {
+		let data: RequestData = null;
 		let fetchParams: FetchParams | undefined;
 		let headers: ResponseHeaders | null = null;
 		let extractor: ErrorMessageExtractor | null | undefined = null;
 
-		if (dataOrOptions && (
-			'data' in dataOrOptions ||
-			'params' in dataOrOptions ||
-			'respHeaders' in dataOrOptions ||
-			'errorExtractor' in dataOrOptions
-		)) {
+		if (
+			dataOrOptions &&
+			typeof dataOrOptions === 'object' &&
+			!(dataOrOptions instanceof FormData) &&
+			('data' in dataOrOptions ||
+				'params' in dataOrOptions ||
+				'respHeaders' in dataOrOptions ||
+				'errorExtractor' in dataOrOptions)
+		) {
 			const opts = dataOrOptions as DataOptions;
 			data = opts.data ?? null;
 			fetchParams = opts.params;
 			headers = opts.respHeaders ?? null;
 			extractor = opts.errorExtractor ?? null;
 		} else {
-			data = dataOrOptions ?? null;
+			data = (dataOrOptions as RequestData) ?? null;
 			fetchParams = params;
 			headers = respHeaders ?? null;
 			extractor = errorMessageExtractor ?? null;
@@ -460,42 +476,45 @@ export class HttpApi {
 	}
 
 	/** Performs a PATCH request (new options API). @see post */
-	async patch(path: string, options: DataOptions): Promise<any>;
+	async patch(path: string, options: DataOptions): Promise<unknown>;
 	/** Performs a PATCH request (legacy API). @see post */
 	async patch(
 		path: string,
-		data?: any,
+		data?: RequestData,
 		params?: FetchParams,
 		respHeaders?: ResponseHeaders | null,
 		errorMessageExtractor?: ErrorMessageExtractor | null,
 		_dumpParams?: boolean
-	): Promise<any>;
+	): Promise<unknown>;
 	async patch(
 		path: string,
-		dataOrOptions?: any | DataOptions,
+		dataOrOptions?: RequestData | DataOptions,
 		params?: FetchParams,
 		respHeaders?: ResponseHeaders | null,
 		errorMessageExtractor?: ErrorMessageExtractor | null,
 		_dumpParams = false
-	): Promise<any> {
-		let data: any = null;
+	): Promise<unknown> {
+		let data: RequestData = null;
 		let fetchParams: FetchParams | undefined;
 		let headers: ResponseHeaders | null = null;
 		let extractor: ErrorMessageExtractor | null | undefined = null;
 
-		if (dataOrOptions && (
-			'data' in dataOrOptions ||
-			'params' in dataOrOptions ||
-			'respHeaders' in dataOrOptions ||
-			'errorExtractor' in dataOrOptions
-		)) {
+		if (
+			dataOrOptions &&
+			typeof dataOrOptions === 'object' &&
+			!(dataOrOptions instanceof FormData) &&
+			('data' in dataOrOptions ||
+				'params' in dataOrOptions ||
+				'respHeaders' in dataOrOptions ||
+				'errorExtractor' in dataOrOptions)
+		) {
 			const opts = dataOrOptions as DataOptions;
 			data = opts.data ?? null;
 			fetchParams = opts.params;
 			headers = opts.respHeaders ?? null;
 			extractor = opts.errorExtractor ?? null;
 		} else {
-			data = dataOrOptions ?? null;
+			data = (dataOrOptions as RequestData) ?? null;
 			fetchParams = params;
 			headers = respHeaders ?? null;
 			extractor = errorMessageExtractor ?? null;
@@ -515,42 +534,45 @@ export class HttpApi {
 	 * Note: Request body in DELETE is allowed per HTTP spec.
 	 * @see post
 	 */
-	async del(path: string, options: DataOptions): Promise<any>;
+	async del(path: string, options: DataOptions): Promise<unknown>;
 	/** Performs a DELETE request (legacy API). @see post */
 	async del(
 		path: string,
-		data?: any,
+		data?: RequestData,
 		params?: FetchParams,
 		respHeaders?: ResponseHeaders | null,
 		errorMessageExtractor?: ErrorMessageExtractor | null,
 		_dumpParams?: boolean
-	): Promise<any>;
+	): Promise<unknown>;
 	async del(
 		path: string,
-		dataOrOptions?: any | DataOptions,
+		dataOrOptions?: RequestData | DataOptions,
 		params?: FetchParams,
 		respHeaders?: ResponseHeaders | null,
 		errorMessageExtractor?: ErrorMessageExtractor | null,
 		_dumpParams = false
-	): Promise<any> {
-		let data: any = null;
+	): Promise<unknown> {
+		let data: RequestData = null;
 		let fetchParams: FetchParams | undefined;
 		let headers: ResponseHeaders | null = null;
 		let extractor: ErrorMessageExtractor | null | undefined = null;
 
-		if (dataOrOptions && (
-			'data' in dataOrOptions ||
-			'params' in dataOrOptions ||
-			'respHeaders' in dataOrOptions ||
-			'errorExtractor' in dataOrOptions
-		)) {
+		if (
+			dataOrOptions &&
+			typeof dataOrOptions === 'object' &&
+			!(dataOrOptions instanceof FormData) &&
+			('data' in dataOrOptions ||
+				'params' in dataOrOptions ||
+				'respHeaders' in dataOrOptions ||
+				'errorExtractor' in dataOrOptions)
+		) {
 			const opts = dataOrOptions as DataOptions;
 			data = opts.data ?? null;
 			fetchParams = opts.params;
 			headers = opts.respHeaders ?? null;
 			extractor = opts.errorExtractor ?? null;
 		} else {
-			data = dataOrOptions ?? null;
+			data = (dataOrOptions as RequestData) ?? null;
 			fetchParams = params;
 			headers = respHeaders ?? null;
 			extractor = errorMessageExtractor ?? null;

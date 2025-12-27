@@ -31,7 +31,7 @@ class HttpError extends Error {
 	/** HTTP status text (e.g., "Not Found", "Internal Server Error") */
 	public statusText: string = HTTP_STATUS.ERROR_SERVER.INTERNAL_SERVER_ERROR.TEXT;
 	/** Response body (auto-parsed as JSON if possible) */
-	public body: any = null;
+	public body: unknown = null;
 }
 
 // Client error classes (4xx)
@@ -233,11 +233,13 @@ const _wellKnownCtorMap = {
 	'503': ServiceUnavailable,
 };
 
-const _maybeJsonParse = (v: any) => {
+const _maybeJsonParse = (v: unknown): unknown => {
 	if (typeof v === 'string') {
 		try {
-			v = JSON.parse(v);
-		} catch (e) {}
+			return JSON.parse(v);
+		} catch (_e) {
+			// ignore parse errors
+		}
 	}
 	return v;
 };
@@ -265,8 +267,8 @@ const _maybeJsonParse = (v: any) => {
 export const createHttpError = (
 	code: number | string,
 	message?: string | null,
-	body?: any,
-	cause?: any
+	body?: unknown,
+	cause?: unknown
 ): HttpError => {
 	const fallback = HTTP_STATUS.ERROR_SERVER.INTERNAL_SERVER_ERROR;
 
@@ -311,38 +313,37 @@ export const createHttpError = (
  *
  * @returns A human-readable error message string.
  */
-export const getErrorMessage = (e: any, stripErrorPrefix = true): string => {
+export const getErrorMessage = (e: unknown, stripErrorPrefix = true): string => {
 	if (!e) return '';
 
 	// Errors may bubble from various sources which are not always under control.
 	// We try our best to extract a meaningful message using common conventions.
-	const cause = _maybeJsonParse(e?.cause);
-	const body = _maybeJsonParse(e?.body);
+	const err = e as Record<string, unknown>;
+	const cause = _maybeJsonParse(err?.cause) as Record<string, unknown> | string | null;
+	const body = _maybeJsonParse(err?.body) as Record<string, unknown> | string | null;
 
-	let msg =
+	let msg: string = String(
 		// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/cause
 		// e.cause is the standard prop for error details, so should be considered as
 		// the most authoritative (if available)
 		// "code" and "message" are my own conventions
-		cause?.message ||
-		cause?.code ||
+		(typeof cause === 'object' ? cause?.message : null) ||
+		(typeof cause === 'object' ? cause?.code : null) ||
 		(typeof cause === 'string' ? cause : null) ||
 		// non-standard "body" is this package's HttpError prop
-		body?.error?.message ||
-		body?.message ||
-		body?.error ||
+		(typeof body === 'object' ? (body?.error as Record<string, unknown>)?.message : null) ||
+		(typeof body === 'object' ? body?.message : null) ||
+		(typeof body === 'object' ? body?.error : null) ||
 		(typeof body === 'string' ? body : null) ||
 		// the common message from Error ctor (e.g. "Foo" if new TypeError("Foo"))
-		e?.message ||
+		err?.message ||
 		// the Error class name (e.g. TypeError)
-		e?.name ||
+		err?.name ||
 		// this should handle (almost) everything else (mainly if e is not an Error instance)
-		e?.toString() ||
+		(typeof err?.toString === 'function' ? err.toString() : null) ||
 		// very last fallback if `toString()` was not available (or returned empty)
-		'Unknown Error';
-
-	// ensure we're sending string
-	msg = `${msg}`;
+		'Unknown Error'
+	);
 
 	if (stripErrorPrefix) {
 		msg = msg.replace(/^[^:]*Error: /i, '');

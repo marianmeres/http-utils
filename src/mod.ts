@@ -30,6 +30,7 @@ export {
 	type FetchParams,
 	type ErrorMessageExtractor,
 	type ResponseHeaders,
+	type RequestData,
 } from "./api.ts";
 export { HTTP_ERROR, createHttpError, getErrorMessage } from "./error.ts";
 export { HTTP_STATUS } from "./status.ts";
