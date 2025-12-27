@@ -2,6 +2,17 @@ import { assert, assertEquals } from "@std/assert";
 import { createHttpApi, HTTP_ERROR } from "../src/mod.ts";
 import { getAvailablePort, hostname } from "./_helpers.ts";
 
+// Helper types for test assertions
+type ErrorBody = { error: { message: string } };
+type ErrorCause = { response: { headers: Record<string, string> } };
+type DumpedParams = {
+	headers: Record<string, string>;
+	method: string;
+	path: string;
+	credentials: string;
+	data: Record<string, unknown>;
+};
+
 const CUSTOM_ERR_MSG = "this is custom error";
 
 async function createTestServer(port: number): Promise<Deno.HttpServer> {
@@ -52,9 +63,12 @@ Deno.test("createHttpApi GET", async () => {
 
 	try {
 		const api = createHttpApi();
-		const respHeaders: any = {};
+		const respHeaders: Record<string, string | number> = {};
 
-		const r: any = await api.get(`${url}/echo`, {}, respHeaders);
+		const r = (await api.get(`${url}/echo`, {}, respHeaders)) as Record<
+			string,
+			unknown
+		>;
 		assertEquals(r.foo, "bar");
 		assertEquals(respHeaders.__http_status_code__, 200);
 	} finally {
@@ -64,7 +78,7 @@ Deno.test("createHttpApi GET", async () => {
 
 Deno.test("createHttpApi base option", async () => {
 	const api = createHttpApi(url);
-	const respHeaders: any = {};
+	const respHeaders: Record<string, string | number> = {};
 
 	const r = (await api.get("/echo", {}, respHeaders)) as Record<
 		string,
@@ -99,8 +113,8 @@ Deno.test("createHttpApi error", async () => {
 		assert(false); // must not be reached
 	} catch (e) {
 		assert(e instanceof HTTP_ERROR.NotFound);
-		assertEquals((e as any).body.error.message, CUSTOM_ERR_MSG);
-		assertEquals((e as any).cause.response.headers.hey, "ho");
+		assertEquals((e.body as ErrorBody).error.message, CUSTOM_ERR_MSG);
+		assertEquals((e.cause as ErrorCause).response.headers.hey, "ho");
 	}
 });
 
@@ -115,7 +129,7 @@ Deno.test("createHttpApi error { raw: true }", async () => {
 
 Deno.test("createHttpApi error { assert: false } does not throw", async () => {
 	const api = createHttpApi();
-	const respHeaders: any = {};
+	const respHeaders: Record<string, string | number> = {};
 
 	const r = (await api.get(
 		`${url}/asdf`,
@@ -134,16 +148,18 @@ Deno.test("custom local error message extractor", async () => {
 			`${url}/asdf`,
 			undefined,
 			undefined,
-			(body: any, _resp: Response) => {
-				return body.error.message.toUpperCase();
+			(body: unknown, _resp: Response) => {
+				return (
+					body as Record<string, Record<string, string>>
+				).error.message.toUpperCase();
 			}
 		);
 		assert(false); // must not be reached
 	} catch (e) {
 		assert(e instanceof HTTP_ERROR.NotFound);
-		assertEquals((e as any).message, CUSTOM_ERR_MSG.toUpperCase());
-		assertEquals((e as any).body.error.message, CUSTOM_ERR_MSG);
-		assertEquals((e as any).cause.response.headers.hey, "ho");
+		assertEquals(e.message, CUSTOM_ERR_MSG.toUpperCase());
+		assertEquals((e.body as ErrorBody).error.message, CUSTOM_ERR_MSG);
+		assertEquals((e.cause as ErrorCause).response.headers.hey, "ho");
 	}
 });
 
@@ -151,8 +167,10 @@ Deno.test("custom factory error message extractor", async () => {
 	const api = createHttpApi(
 		undefined,
 		undefined,
-		(body: any, _resp: Response) => {
-			return body.error.message.toUpperCase();
+		(body: unknown, _resp: Response) => {
+			return (
+				body as Record<string, Record<string, string>>
+			).error.message.toUpperCase();
 		}
 	);
 
@@ -161,15 +179,20 @@ Deno.test("custom factory error message extractor", async () => {
 		assert(false); // must not be reached
 	} catch (e) {
 		assert(e instanceof HTTP_ERROR.NotFound);
-		assertEquals((e as any).message, CUSTOM_ERR_MSG.toUpperCase());
-		assertEquals((e as any).body.error.message, CUSTOM_ERR_MSG);
-		assertEquals((e as any).cause.response.headers.hey, "ho");
+		assertEquals(e.message, CUSTOM_ERR_MSG.toUpperCase());
+		assertEquals((e.body as ErrorBody).error.message, CUSTOM_ERR_MSG);
+		assertEquals((e.cause as ErrorCause).response.headers.hey, "ho");
 	}
 });
 
 Deno.test("custom global error message extractor", async () => {
-	createHttpApi.defaultErrorMessageExtractor = (body: any, _resp: Response) => {
-		return body.error.message.toUpperCase();
+	createHttpApi.defaultErrorMessageExtractor = (
+		body: unknown,
+		_resp: Response
+	) => {
+		return (
+			body as Record<string, Record<string, string>>
+		).error.message.toUpperCase();
 	};
 
 	const api = createHttpApi();
@@ -179,15 +202,15 @@ Deno.test("custom global error message extractor", async () => {
 		assert(false); // must not be reached
 	} catch (e) {
 		assert(e instanceof HTTP_ERROR.NotFound);
-		assertEquals((e as any).message, CUSTOM_ERR_MSG.toUpperCase());
-		assertEquals((e as any).body.error.message, CUSTOM_ERR_MSG);
-		assertEquals((e as any).cause.response.headers.hey, "ho");
+		assertEquals(e.message, CUSTOM_ERR_MSG.toUpperCase());
+		assertEquals((e.body as ErrorBody).error.message, CUSTOM_ERR_MSG);
+		assertEquals((e.cause as ErrorCause).response.headers.hey, "ho");
 	}
 });
 
 Deno.test("createHttpApi POST", async () => {
 	const api = createHttpApi();
-	const respHeaders: any = {};
+	const respHeaders: Record<string, string | number> = {};
 
 	const r = (await api.post(
 		`${url}/echo`,
@@ -203,26 +226,27 @@ Deno.test("createHttpApi POST", async () => {
 Deno.test("createHttpApi merge default params", async () => {
 	const api = createHttpApi(null, {
 		headers: { authorization: "Bearer foo" },
-		method: "must be ignored" as any,
-		path: "must be ignored" as any,
+		// @ts-expect-error testing that invalid props are ignored
+		method: "must be ignored",
+		path: "must be ignored" as unknown as undefined, // invalid prop, should be ignored
 		credentials: "include",
 	});
 
-	const params = await api.post(
+	const params = (await api.post(
 		"/hoho",
 		{ foo: "bar" },
 		{ headers: { hey: "ho" } },
 		null,
 		null,
 		true
-	);
+	)) as DumpedParams;
 
-	assertEquals((params as any).headers.authorization, "Bearer foo");
-	assertEquals((params as any).headers.hey, "ho");
-	assertEquals((params as any).method, "POST");
-	assertEquals((params as any).path, "/hoho");
-	assertEquals((params as any).credentials, "include");
-	assertEquals((params as any).data.foo, "bar");
+	assertEquals(params.headers.authorization, "Bearer foo");
+	assertEquals(params.headers.hey, "ho");
+	assertEquals(params.method, "POST");
+	assertEquals(params.path, "/hoho");
+	assertEquals(params.credentials, "include");
+	assertEquals(params.data.foo, "bar");
 });
 
 Deno.test("url build", () => {

@@ -90,7 +90,7 @@ Performs a GET request.
 
 **New Options API (recommended):**
 ```ts
-async get(path: string, options?: GetOptions): Promise<any>
+async get(path: string, options?: GetOptions): Promise<unknown>
 ```
 
 **Legacy API:**
@@ -100,7 +100,7 @@ async get(
   params?: FetchParams,
   respHeaders?: ResponseHeaders | null,
   errorMessageExtractor?: ErrorMessageExtractor | null
-): Promise<any>
+): Promise<unknown>
 ```
 
 **Example:**
@@ -121,18 +121,18 @@ Performs a POST request.
 
 **New Options API (recommended):**
 ```ts
-async post(path: string, options?: DataOptions): Promise<any>
+async post(path: string, options?: DataOptions): Promise<unknown>
 ```
 
 **Legacy API:**
 ```ts
 async post(
   path: string,
-  data?: any,
+  data?: RequestData,
   params?: FetchParams,
   respHeaders?: ResponseHeaders | null,
   errorMessageExtractor?: ErrorMessageExtractor | null
-): Promise<any>
+): Promise<unknown>
 ```
 
 **Example:**
@@ -189,6 +189,14 @@ set base(v: string | null | undefined)
 
 ## Types
 
+### RequestData
+
+Request body data type.
+
+```ts
+type RequestData = Record<string, unknown> | FormData | string | null;
+```
+
 ### FetchParams
 
 Parameters for fetch requests.
@@ -196,7 +204,7 @@ Parameters for fetch requests.
 ```ts
 interface FetchParams {
   /** Request body data (automatically JSON stringified unless FormData). */
-  data?: any;
+  data?: RequestData;
   /** Bearer token (auto-adds `Authorization: Bearer {token}` header). */
   token?: string | null;
   /** Custom request headers. */
@@ -234,7 +242,7 @@ Options for HTTP POST/PUT/PATCH/DELETE requests (new API).
 ```ts
 interface DataOptions {
   /** Request body data. */
-  data?: any;
+  data?: RequestData;
   /** Fetch parameters (headers, token, signal, credentials, raw, assert). */
   params?: FetchParams;
   /** Object to receive response headers (will be mutated). */
@@ -261,7 +269,7 @@ Special keys added after request:
 Function to extract error messages from failed HTTP responses.
 
 ```ts
-type ErrorMessageExtractor = (body: any, response: Response) => string;
+type ErrorMessageExtractor = (body: unknown, response: Response) => string;
 ```
 
 ---
@@ -276,8 +284,8 @@ All errors extend `HttpError` base class.
 class HttpError extends Error {
   status: number;      // HTTP status code
   statusText: string;  // HTTP status text
-  body: any;          // Response body (auto-parsed as JSON)
-  cause: any;         // Error cause/details
+  body: unknown;       // Response body (auto-parsed as JSON)
+  cause: unknown;      // Error cause/details
 }
 ```
 
@@ -408,8 +416,8 @@ Creates an HTTP error from a status code and optional details.
 function createHttpError(
   code: number | string,
   message?: string | null,
-  body?: any,
-  cause?: any
+  body?: unknown,
+  cause?: unknown
 ): HttpError
 ```
 
@@ -428,7 +436,7 @@ console.log(error.body);                // { userId: 123 }
 Extracts a human-readable error message from various error formats.
 
 ```ts
-function getErrorMessage(e: any, stripErrorPrefix?: boolean): string
+function getErrorMessage(e: unknown, stripErrorPrefix?: boolean): string
 ```
 
 **Priority order:**

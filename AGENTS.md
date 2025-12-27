@@ -41,19 +41,21 @@ function createHttpApi(
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| `get` | `get(path, options?: GetOptions): Promise<any>` | GET request |
-| `post` | `post(path, options?: DataOptions): Promise<any>` | POST request |
-| `put` | `put(path, options?: DataOptions): Promise<any>` | PUT request |
-| `patch` | `patch(path, options?: DataOptions): Promise<any>` | PATCH request |
-| `del` | `del(path, options?: DataOptions): Promise<any>` | DELETE request |
+| `get` | `get(path, options?: GetOptions): Promise<unknown>` | GET request |
+| `post` | `post(path, options?: DataOptions): Promise<unknown>` | POST request |
+| `put` | `put(path, options?: DataOptions): Promise<unknown>` | PUT request |
+| `patch` | `patch(path, options?: DataOptions): Promise<unknown>` | PATCH request |
+| `del` | `del(path, options?: DataOptions): Promise<unknown>` | DELETE request |
 | `url` | `url(path: string): string` | Build full URL |
 | `base` | `get/set base: string \| null` | Base URL property |
 
 ### Exported Types
 
 ```typescript
+type RequestData = Record<string, unknown> | FormData | string | null;
+
 interface FetchParams {
-  data?: any;
+  data?: RequestData;
   token?: string | null;
   headers?: Record<string, string> | null;
   signal?: AbortSignal;
@@ -69,13 +71,13 @@ interface GetOptions {
 }
 
 interface DataOptions {
-  data?: any;
+  data?: RequestData;
   params?: FetchParams;
   respHeaders?: ResponseHeaders | null;
   errorExtractor?: ErrorMessageExtractor | null;
 }
 
-type ErrorMessageExtractor = (body: any, response: Response) => string;
+type ErrorMessageExtractor = (body: unknown, response: Response) => string;
 type ResponseHeaders = Record<string, string | number>;
 ```
 
@@ -104,8 +106,8 @@ HTTP_ERROR.ServiceUnavailable // 503
 ### Utility Functions
 
 ```typescript
-function createHttpError(code: number | string, message?: string | null, body?: any, cause?: any): HttpError
-function getErrorMessage(e: any, stripErrorPrefix?: boolean): string
+function createHttpError(code: number | string, message?: string | null, body?: unknown, cause?: unknown): HttpError
+function getErrorMessage(e: unknown, stripErrorPrefix?: boolean): string
 ```
 
 ### HTTP Status Codes

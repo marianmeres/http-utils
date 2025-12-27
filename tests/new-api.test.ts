@@ -47,7 +47,7 @@ Deno.test.afterEach(async () => {
 
 Deno.test("new API: GET with options object", async () => {
 	const api = createHttpApi(url);
-	const respHeaders: any = {};
+	const respHeaders: Record<string, string | number> = {};
 
 	// New API style
 	const data = (await api.get("/echo", {
@@ -62,7 +62,7 @@ Deno.test("new API: GET with options object", async () => {
 
 Deno.test("new API: POST with options object", async () => {
 	const api = createHttpApi(url);
-	const respHeaders: any = {};
+	const respHeaders: Record<string, string | number> = {};
 
 	// New API style
 	const data = (await api.post("/echo", {
@@ -103,7 +103,7 @@ Deno.test("new API: POST without data field (should work)", async () => {
 
 Deno.test("backward compatibility: legacy GET API still works", async () => {
 	const api = createHttpApi(url);
-	const respHeaders: any = {};
+	const respHeaders: Record<string, string | number> = {};
 
 	// Old API style (positional arguments)
 	const data = (await api.get(
@@ -119,7 +119,7 @@ Deno.test("backward compatibility: legacy GET API still works", async () => {
 
 Deno.test("backward compatibility: legacy POST API still works", async () => {
 	const api = createHttpApi(url);
-	const respHeaders: any = {};
+	const respHeaders: Record<string, string | number> = {};
 
 	// Old API style (positional arguments)
 	const data = (await api.post(
