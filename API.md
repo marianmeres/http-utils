@@ -84,61 +84,66 @@ HTTP API client class. Usually created via `createHttpApi()`.
 
 ### Methods
 
-#### `get(path, options?)`
+#### `get<T>(path, options?)`
 
 Performs a GET request.
 
 **New Options API (recommended):**
 ```ts
-async get(path: string, options?: GetOptions): Promise<unknown>
+async get<T = unknown>(path: string, options?: GetOptions): Promise<T>
 ```
 
 **Legacy API:**
 ```ts
-async get(
+async get<T = unknown>(
   path: string,
   params?: FetchParams,
   respHeaders?: ResponseHeaders | null,
   errorMessageExtractor?: ErrorMessageExtractor | null
-): Promise<unknown>
+): Promise<T>
 ```
 
 **Example:**
 ```ts
-// New API
-const data = await api.get("/users", {
+// New API with type parameter
+interface User { id: number; name: string; }
+const user = await api.get<User>("/users/1", {
   params: { headers: { "X-Custom": "value" } },
   respHeaders: {}
 });
+
+// Without type parameter (returns unknown)
+const data = await api.get("/users");
 
 // Legacy API
 const data = await api.get("/users", { headers: { "X-Custom": "value" } });
 ```
 
-#### `post(path, options?)`
+#### `post<T>(path, options?)`
 
 Performs a POST request.
 
 **New Options API (recommended):**
 ```ts
-async post(path: string, options?: DataOptions): Promise<unknown>
+async post<T = unknown>(path: string, options?: DataOptions): Promise<T>
 ```
 
 **Legacy API:**
 ```ts
-async post(
+async post<T = unknown>(
   path: string,
   data?: RequestData,
   params?: FetchParams,
   respHeaders?: ResponseHeaders | null,
   errorMessageExtractor?: ErrorMessageExtractor | null
-): Promise<unknown>
+): Promise<T>
 ```
 
 **Example:**
 ```ts
-// New API
-const result = await api.post("/users", {
+// New API with type parameter
+interface User { id: number; name: string; }
+const user = await api.post<User>("/users", {
   data: { name: "John" },
   params: { headers: { "X-Custom": "value" } }
 });
@@ -147,17 +152,17 @@ const result = await api.post("/users", {
 const result = await api.post("/users", { name: "John" });
 ```
 
-#### `put(path, options?)`
+#### `put<T>(path, options?)`
 
-Performs a PUT request. Same signature as `post()`.
+Performs a PUT request. Same signature as `post<T>()`.
 
-#### `patch(path, options?)`
+#### `patch<T>(path, options?)`
 
-Performs a PATCH request. Same signature as `post()`.
+Performs a PATCH request. Same signature as `post<T>()`.
 
-#### `del(path, options?)`
+#### `del<T>(path, options?)`
 
-Performs a DELETE request. Same signature as `post()`.
+Performs a DELETE request. Same signature as `post<T>()`.
 
 #### `url(path)`
 

@@ -13,6 +13,7 @@ Opinionated, lightweight HTTP client wrapper for `fetch` with type-safe errors a
 - 🪶 **Lightweight** - Zero dependencies, thin wrapper over native `fetch`
 - 🎨 **Flexible error handling** - Three-tier error message extraction (local → factory → global)
 - 📦 **Deno & Node.js** - Works in both runtimes
+- 🦾 **Generic return types** - Optional type parameters for typed responses
 
 ## Installation
 
@@ -52,6 +53,11 @@ const newUser = await api.post("/users", {
 // Legacy API still works
 const legacyUsers = await api.get("/users", { headers: { "X-Custom": "value" } });
 const legacyUser = await api.post("/users", { name: "John Doe" });
+
+// With type parameters for typed responses
+interface User { id: number; name: string; }
+const user = await api.get<User>("/users/1");
+const created = await api.post<User>("/users", { data: { name: "Jane" } });
 
 // Error handling
 try {
@@ -123,6 +129,7 @@ try {
 - **Raw response**: Use `raw: true` to get the raw Response object
 - **Non-throwing**: Use `assert: false` to prevent throwing on errors
 - **AbortController**: Pass `signal` for request cancellation
+- **Typed responses**: Use generics for type-safe responses: `api.get<User>("/users/1")`
 
 ## Full API Reference
 

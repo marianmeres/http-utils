@@ -280,7 +280,7 @@ export class HttpApi {
 	 * });
 	 * ```
 	 */
-	async get(path: string, options: GetOptions): Promise<unknown>;
+	async get<T = unknown>(path: string, options: GetOptions): Promise<T>;
 
 	/**
 	 * Performs a GET request (legacy API).
@@ -293,13 +293,13 @@ export class HttpApi {
 	 * @returns The response body (auto-parsed as JSON if possible), or Response if `raw: true`.
 	 * @throws {HttpError} When the response is not OK and `assert` is true (default).
 	 */
-	async get(
+	async get<T = unknown>(
 		path: string,
 		params?: FetchParams,
 		respHeaders?: ResponseHeaders | null,
 		errorMessageExtractor?: ErrorMessageExtractor | null,
 		_dumpParams?: boolean
-	): Promise<unknown>;
+	): Promise<T>;
 
 	async get(
 		path: string,
@@ -352,7 +352,7 @@ export class HttpApi {
 	 * });
 	 * ```
 	 */
-	async post(path: string, options: DataOptions): Promise<unknown>;
+	async post<T = unknown>(path: string, options: DataOptions): Promise<T>;
 
 	/**
 	 * Performs a POST request (legacy API).
@@ -366,14 +366,14 @@ export class HttpApi {
 	 * @returns The response body (auto-parsed as JSON if possible), or Response if `raw: true`.
 	 * @throws {HttpError} When the response is not OK and `assert` is true (default).
 	 */
-	async post(
+	async post<T = unknown>(
 		path: string,
 		data?: RequestData,
 		params?: FetchParams,
 		respHeaders?: ResponseHeaders | null,
 		errorMessageExtractor?: ErrorMessageExtractor | null,
 		_dumpParams?: boolean
-	): Promise<unknown>;
+	): Promise<T>;
 
 	async post(
 		path: string,
@@ -422,16 +422,16 @@ export class HttpApi {
 	}
 
 	/** Performs a PUT request (new options API). @see post */
-	async put(path: string, options: DataOptions): Promise<unknown>;
+	async put<T = unknown>(path: string, options: DataOptions): Promise<T>;
 	/** Performs a PUT request (legacy API). @see post */
-	async put(
+	async put<T = unknown>(
 		path: string,
 		data?: RequestData,
 		params?: FetchParams,
 		respHeaders?: ResponseHeaders | null,
 		errorMessageExtractor?: ErrorMessageExtractor | null,
 		_dumpParams?: boolean
-	): Promise<unknown>;
+	): Promise<T>;
 	async put(
 		path: string,
 		dataOrOptions?: RequestData | DataOptions,
@@ -476,16 +476,16 @@ export class HttpApi {
 	}
 
 	/** Performs a PATCH request (new options API). @see post */
-	async patch(path: string, options: DataOptions): Promise<unknown>;
+	async patch<T = unknown>(path: string, options: DataOptions): Promise<T>;
 	/** Performs a PATCH request (legacy API). @see post */
-	async patch(
+	async patch<T = unknown>(
 		path: string,
 		data?: RequestData,
 		params?: FetchParams,
 		respHeaders?: ResponseHeaders | null,
 		errorMessageExtractor?: ErrorMessageExtractor | null,
 		_dumpParams?: boolean
-	): Promise<unknown>;
+	): Promise<T>;
 	async patch(
 		path: string,
 		dataOrOptions?: RequestData | DataOptions,
@@ -534,16 +534,16 @@ export class HttpApi {
 	 * Note: Request body in DELETE is allowed per HTTP spec.
 	 * @see post
 	 */
-	async del(path: string, options: DataOptions): Promise<unknown>;
+	async del<T = unknown>(path: string, options: DataOptions): Promise<T>;
 	/** Performs a DELETE request (legacy API). @see post */
-	async del(
+	async del<T = unknown>(
 		path: string,
 		data?: RequestData,
 		params?: FetchParams,
 		respHeaders?: ResponseHeaders | null,
 		errorMessageExtractor?: ErrorMessageExtractor | null,
 		_dumpParams?: boolean
-	): Promise<unknown>;
+	): Promise<T>;
 	async del(
 		path: string,
 		dataOrOptions?: RequestData | DataOptions,
