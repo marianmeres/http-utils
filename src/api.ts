@@ -5,7 +5,7 @@
  * Provides a convenient wrapper over the native `fetch` API with sensible defaults.
  */
 
-import { createHttpError } from './error.ts';
+import { createHttpError } from "./error.ts";
 
 /**
  * Request body data type.
@@ -16,11 +16,14 @@ export type RequestData = Record<string, unknown> | FormData | string | null;
 /**
  * Deep merges two objects. Later properties overwrite earlier properties.
  */
-function deepMerge<T = unknown>(target: Record<string, unknown>, source: Record<string, unknown>): T {
+function deepMerge<T = unknown>(
+	target: Record<string, unknown>,
+	source: Record<string, unknown>
+): T {
 	const output = { ...target };
 
 	if (isObject(target) && isObject(source)) {
-		Object.keys(source).forEach(key => {
+		Object.keys(source).forEach((key) => {
 			const sourceVal = source[key];
 			const targetVal = target[key];
 			if (isObject(sourceVal)) {
@@ -39,11 +42,11 @@ function deepMerge<T = unknown>(target: Record<string, unknown>, source: Record<
 }
 
 function isObject(item: unknown): item is Record<string, unknown> {
-	return item !== null && typeof item === 'object' && !Array.isArray(item);
+	return item !== null && typeof item === "object" && !Array.isArray(item);
 }
 
 interface BaseParams {
-	method: 'GET' | 'POST' | 'PATCH' | 'DELETE' | 'PUT';
+	method: "GET" | "POST" | "PATCH" | "DELETE" | "PUT";
 	path: string;
 }
 
@@ -56,11 +59,11 @@ export interface FetchParams {
 	/** Bearer token (auto-adds `Authorization: Bearer {token}` header). */
 	token?: string | null;
 	/** Custom request headers. */
-	headers?: Record<string, string> | null;
+	headers?: HeadersInit | Record<string, string> | null;
 	/** AbortSignal for request cancellation. */
 	signal?: AbortSignal;
 	/** Credentials mode for the request. */
-	credentials?: 'omit' | 'same-origin' | 'include' | null;
+	credentials?: "omit" | "same-origin" | "include" | null;
 	/** If true, returns the raw Response object instead of parsed body. */
 	raw?: boolean | null;
 	/** If false, does not throw on HTTP errors (default: true). */
@@ -75,7 +78,10 @@ type BaseFetchParams = BaseParams & FetchParams;
  * @param response - The raw Response object.
  * @returns A human-readable error message string.
  */
-export type ErrorMessageExtractor = (body: unknown, response: Response) => string;
+export type ErrorMessageExtractor = (
+	body: unknown,
+	response: Response
+) => string;
 
 /**
  * Object to receive response headers after a request completes.
@@ -112,7 +118,7 @@ export interface DataOptions {
 }
 
 /** Symbol marker for explicit options API detection. */
-const OPTIONS_MARKER = Symbol('options');
+const OPTIONS_MARKER = Symbol("options");
 
 /**
  * Marks an options object for the new options API.
@@ -181,7 +187,7 @@ function parseDataOptions(
 ): ParsedDataOptions {
 	if (
 		dataOrOptions &&
-		typeof dataOrOptions === 'object' &&
+		typeof dataOrOptions === "object" &&
 		OPTIONS_MARKER in dataOrOptions
 	) {
 		// New options API (explicit via opts() wrapper)
@@ -211,20 +217,22 @@ const _fetchRaw = async ({
 	signal,
 	credentials,
 }: BaseFetchParams) => {
-	const normalizedHeaders: Record<string, string> = Object.entries(headers || {}).reduce(
-		(m, [k, v]) => ({ ...m, [k.toLowerCase()]: v }),
-		{}
-	);
+	const normalizedHeaders: Record<string, string> = {};
+	if (headers) {
+		new Headers(headers as HeadersInit).forEach((value, key) => {
+			normalizedHeaders[key] = value;
+		});
+	}
 
 	const opts: RequestInit = {
 		method,
 		credentials: credentials ?? undefined,
 		headers: normalizedHeaders,
-		signal
+		signal,
 	};
 
 	if (data) {
-		const isObj = typeof data === 'object';
+		const isObj = typeof data === "object";
 
 		// FormData: multipart/form-data -- no explicit Content-Type
 		if (data instanceof FormData) {
@@ -233,8 +241,8 @@ const _fetchRaw = async ({
 		// Cover 99% of use cases (may not fit all scenarios)
 		else {
 			// If not explicitly stated, assume JSON
-			if (isObj || !normalizedHeaders['content-type']) {
-				normalizedHeaders['content-type'] = 'application/json';
+			if (isObj || !normalizedHeaders["content-type"]) {
+				normalizedHeaders["content-type"] = "application/json";
 			}
 			opts.body = JSON.stringify(data);
 		}
@@ -242,7 +250,7 @@ const _fetchRaw = async ({
 
 	// Opinionated convention: auto-add Bearer token
 	if (token) {
-		normalizedHeaders['authorization'] = `Bearer ${token}`;
+		normalizedHeaders["authorization"] = `Bearer ${token}`;
 	}
 
 	opts.headers = normalizedHeaders;
@@ -294,10 +302,10 @@ const _fetch = async (
 				let msg: string = String(
 					// try opinionated convention first
 					(b?.error as Record<string, unknown>)?.message ||
-					b?.message ||
-					b?.error ||
-					_response?.statusText ||
-					'Unknown error'
+						b?.message ||
+						b?.error ||
+						_response?.statusText ||
+						"Unknown error"
 				);
 
 				if (msg.length > 255) msg = `[Shortened]: ${msg.slice(0, 255)}`;
@@ -325,12 +333,16 @@ const _fetch = async (
  */
 export class HttpApi {
 	#base?: string | null;
-	#defaults?: Partial<BaseFetchParams> | (() => Promise<Partial<BaseFetchParams>>);
+	#defaults?:
+		| Partial<BaseFetchParams>
+		| (() => Promise<Partial<BaseFetchParams>>);
 	#factoryErrorMessageExtractor?: ErrorMessageExtractor | null | undefined;
 
 	constructor(
 		base?: string | null,
-		defaults?: Partial<BaseFetchParams> | (() => Promise<Partial<BaseFetchParams>>),
+		defaults?:
+			| Partial<BaseFetchParams>
+			| (() => Promise<Partial<BaseFetchParams>>),
 		factoryErrorMessageExtractor?: ErrorMessageExtractor | null | undefined
 	) {
 		this.#base = base;
@@ -346,20 +358,23 @@ export class HttpApi {
 		this.url = this.url.bind(this);
 	}
 
-	#merge<T = unknown>(a: Record<string, unknown>, b: Record<string, unknown>): T {
+	#merge<T = unknown>(
+		a: Record<string, unknown>,
+		b: Record<string, unknown>
+	): T {
 		return deepMerge<T>(a, b);
 	}
 
 	async #getDefs(): Promise<Partial<BaseFetchParams>> {
-		if (typeof this.#defaults === 'function') {
+		if (typeof this.#defaults === "function") {
 			return { ...(await this.#defaults()) };
 		}
 		return { ...(this.#defaults || {}) };
 	}
 
 	#buildPath(path: string, base?: string | null): string {
-		base = `${base || ''}`;
-		path = `${path || ''}`;
+		base = `${base || ""}`;
+		path = `${path || ""}`;
 		return /^https?:/.test(path) ? path : base + path;
 	}
 
@@ -407,15 +422,15 @@ export class HttpApi {
 		errorMessageExtractor?: ErrorMessageExtractor | null,
 		_dumpParams = false
 	): Promise<unknown> {
-		const { params, respHeaders: headers, errorExtractor } = parseGetOptions(
-			paramsOrOptions,
-			respHeaders,
-			errorMessageExtractor
-		);
+		const {
+			params,
+			respHeaders: headers,
+			errorExtractor,
+		} = parseGetOptions(paramsOrOptions, respHeaders, errorMessageExtractor);
 
 		path = this.#buildPath(path, this.#base);
 		return _fetch(
-			this.#merge(await this.#getDefs(), { ...params, method: 'GET', path }),
+			this.#merge(await this.#getDefs(), { ...params, method: "GET", path }),
 			headers,
 			errorExtractor ?? this.#factoryErrorMessageExtractor,
 			_dumpParams
@@ -470,7 +485,12 @@ export class HttpApi {
 		errorMessageExtractor?: ErrorMessageExtractor | null,
 		_dumpParams = false
 	): Promise<unknown> {
-		const { data, params: fetchParams, respHeaders: headers, errorExtractor } = parseDataOptions(
+		const {
+			data,
+			params: fetchParams,
+			respHeaders: headers,
+			errorExtractor,
+		} = parseDataOptions(
 			dataOrOptions,
 			params,
 			respHeaders,
@@ -479,7 +499,12 @@ export class HttpApi {
 
 		path = this.#buildPath(path, this.#base);
 		return _fetch(
-			this.#merge(await this.#getDefs(), { ...(fetchParams || {}), data, method: 'POST', path }),
+			this.#merge(await this.#getDefs(), {
+				...(fetchParams || {}),
+				data,
+				method: "POST",
+				path,
+			}),
 			headers,
 			errorExtractor ?? this.#factoryErrorMessageExtractor,
 			_dumpParams
@@ -505,7 +530,12 @@ export class HttpApi {
 		errorMessageExtractor?: ErrorMessageExtractor | null,
 		_dumpParams = false
 	): Promise<unknown> {
-		const { data, params: fetchParams, respHeaders: headers, errorExtractor } = parseDataOptions(
+		const {
+			data,
+			params: fetchParams,
+			respHeaders: headers,
+			errorExtractor,
+		} = parseDataOptions(
 			dataOrOptions,
 			params,
 			respHeaders,
@@ -514,7 +544,12 @@ export class HttpApi {
 
 		path = this.#buildPath(path, this.#base);
 		return _fetch(
-			this.#merge(await this.#getDefs(), { ...(fetchParams || {}), data, method: 'PUT', path }),
+			this.#merge(await this.#getDefs(), {
+				...(fetchParams || {}),
+				data,
+				method: "PUT",
+				path,
+			}),
 			headers,
 			errorExtractor ?? this.#factoryErrorMessageExtractor,
 			_dumpParams
@@ -540,7 +575,12 @@ export class HttpApi {
 		errorMessageExtractor?: ErrorMessageExtractor | null,
 		_dumpParams = false
 	): Promise<unknown> {
-		const { data, params: fetchParams, respHeaders: headers, errorExtractor } = parseDataOptions(
+		const {
+			data,
+			params: fetchParams,
+			respHeaders: headers,
+			errorExtractor,
+		} = parseDataOptions(
 			dataOrOptions,
 			params,
 			respHeaders,
@@ -549,7 +589,12 @@ export class HttpApi {
 
 		path = this.#buildPath(path, this.#base);
 		return _fetch(
-			this.#merge(await this.#getDefs(), { ...(fetchParams || {}), data, method: 'PATCH', path }),
+			this.#merge(await this.#getDefs(), {
+				...(fetchParams || {}),
+				data,
+				method: "PATCH",
+				path,
+			}),
 			headers,
 			errorExtractor ?? this.#factoryErrorMessageExtractor,
 			_dumpParams
@@ -579,7 +624,12 @@ export class HttpApi {
 		errorMessageExtractor?: ErrorMessageExtractor | null,
 		_dumpParams = false
 	): Promise<unknown> {
-		const { data, params: fetchParams, respHeaders: headers, errorExtractor } = parseDataOptions(
+		const {
+			data,
+			params: fetchParams,
+			respHeaders: headers,
+			errorExtractor,
+		} = parseDataOptions(
 			dataOrOptions,
 			params,
 			respHeaders,
@@ -588,7 +638,12 @@ export class HttpApi {
 
 		path = this.#buildPath(path, this.#base);
 		return _fetch(
-			this.#merge(await this.#getDefs(), { ...(fetchParams || {}), data, method: 'DELETE', path }),
+			this.#merge(await this.#getDefs(), {
+				...(fetchParams || {}),
+				data,
+				method: "DELETE",
+				path,
+			}),
 			headers,
 			errorExtractor ?? this.#factoryErrorMessageExtractor,
 			_dumpParams
@@ -638,7 +693,9 @@ export class HttpApi {
  */
 export function createHttpApi(
 	base?: string | null,
-	defaults?: Partial<BaseFetchParams> | (() => Promise<Partial<BaseFetchParams>>),
+	defaults?:
+		| Partial<BaseFetchParams>
+		| (() => Promise<Partial<BaseFetchParams>>),
 	factoryErrorMessageExtractor?: ErrorMessageExtractor | null | undefined
 ): HttpApi {
 	return new HttpApi(base, defaults, factoryErrorMessageExtractor);

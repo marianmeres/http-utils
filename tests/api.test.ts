@@ -1,6 +1,7 @@
 import { assert, assertEquals } from "@std/assert";
 import { createHttpApi, HTTP_ERROR } from "../src/mod.ts";
 import { getAvailablePort, hostname } from "./_helpers.ts";
+import { register } from "node:module";
 
 // Helper types for test assertions
 type ErrorBody = { error: { message: string } };
@@ -24,12 +25,20 @@ async function createTestServer(port: number): Promise<Deno.HttpServer> {
 			x: req.headers.get("x") || "",
 		});
 
+		// Append all "x-" from request to response as well (so we can test what was sent)
+		[...req.headers.keys()]
+			.filter((k) => k.startsWith("x-"))
+			.forEach((k) => {
+				headers.append(k, req.headers.get(k)!);
+			});
+
 		if (url.pathname === "/echo") {
 			if (req.method === "POST") {
 				const body = await req.text();
 				return new Response(body, { status: 200, headers });
 			} else {
-				return new Response('{"foo":"bar"}', { status: 200, headers });
+				const out = { foo: "bar", ...Object.fromEntries(headers.entries()) };
+				return new Response(JSON.stringify(out), { status: 200, headers });
 			}
 		} else {
 			return new Response(`{"error":{"message":"${CUSTOM_ERR_MSG}"}}`, {
@@ -57,23 +66,23 @@ Deno.test.afterEach(async () => {
 
 // Tests with isolated server instances
 Deno.test("createHttpApi GET", async () => {
-	const port = await getAvailablePort();
-	const url = `http://${hostname}:${port}`;
-	const server = await createTestServer(port);
+	const api = createHttpApi();
+	const respHeaders: Record<string, string | number> = {};
 
-	try {
-		const api = createHttpApi();
-		const respHeaders: Record<string, string | number> = {};
+	const r = (await api.get(`${url}/echo`, {}, respHeaders)) as Record<
+		string,
+		unknown
+	>;
+	assertEquals(r.foo, "bar");
+	assertEquals(respHeaders.__http_status_code__, 200);
+});
 
-		const r = (await api.get(`${url}/echo`, {}, respHeaders)) as Record<
-			string,
-			unknown
-		>;
-		assertEquals(r.foo, "bar");
-		assertEquals(respHeaders.__http_status_code__, 200);
-	} finally {
-		await server.shutdown();
-	}
+Deno.test("createHttpApi GET with headers", async () => {
+	const api = createHttpApi(url);
+	const r = await api.get<Record<string, unknown>>("/echo", {
+		headers: { "X-Hey": "Ho" },
+	});
+	assertEquals(r["x-hey"], "Ho");
 });
 
 Deno.test("createHttpApi base option", async () => {
