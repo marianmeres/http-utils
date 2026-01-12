@@ -11,7 +11,7 @@ import { createHttpError } from "./error.ts";
  * Request body data type.
  * Supports JSON-serializable objects, FormData for file uploads, or raw strings.
  */
-export type RequestData = Record<string, unknown> | FormData | string | null;
+export type RequestData = object | FormData | string | null;
 
 /**
  * Deep merges two objects. Later properties overwrite earlier properties.
