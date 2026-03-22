@@ -1,0 +1,1 @@
+Lightweight HTTP client wrapper for native fetch with type-safe error classes mapped to HTTP status codes (404→NotFound, 401→Unauthorized, etc.) and a factory function for creating pre-configured API instances.
