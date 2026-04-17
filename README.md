@@ -137,13 +137,34 @@ try {
 
 ### Key Features
 
-- **Auto JSON**: Response bodies are automatically parsed as JSON
+- **Auto JSON**: Response bodies are automatically parsed as JSON; empty bodies (204/205) return `null`
+- **Smart body handling**: Plain objects → JSON; `FormData` / `URLSearchParams` / `Blob` / typed arrays / `ReadableStream` pass through; strings sent as-is
+- **Query params**: Pass `query: { page: 1, tag: ["a", "b"] }` for URL search params
+- **Timeouts**: Pass `timeout: 5000` for automatic request cancellation
 - **Bearer tokens**: Use `token` param to auto-add `Authorization: Bearer` header
 - **Response headers**: Pass `respHeaders: {}` to capture response headers
-- **Raw response**: Use `raw: true` to get the raw Response object
+- **Raw response**: Use `raw: true` to get the raw Response object (caller must consume the body)
 - **Non-throwing**: Use `assert: false` to prevent throwing on errors
-- **AbortController**: Pass `signal` for request cancellation
+- **AbortController**: Pass `signal` for request cancellation (composes with `timeout`)
+- **Interceptors**: `api.onRequest(...)` / `api.onResponse(...)` for tracing, auth refresh, etc.
 - **Typed responses**: Use generics for type-safe responses: `api.get<User>("/users/1")`
+
+### Query, Timeout, Interceptors
+
+```ts
+// Query params
+await api.get("/search", { query: { q: "hi", tag: ["a", "b"] } });
+
+// Timeout (abort after 5s; composes with AbortSignal)
+await api.get("/slow", { timeout: 5000 });
+
+// Interceptors
+api.onRequest((init, { method, url }) => {
+  console.log(method, url);
+}).onResponse(async (resp) => {
+  if (resp.status === 401) await refreshToken();
+});
+```
 
 ## Full API Reference
 

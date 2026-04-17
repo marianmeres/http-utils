@@ -4,7 +4,7 @@
 
 ```yaml
 name: "@marianmeres/http-utils"
-version: "2.0.2"
+version: "2.5.1"
 license: MIT
 runtime: deno, node
 type: library
@@ -46,19 +46,40 @@ function createHttpApi(
 | `put` | `put(path, options?: DataOptions): Promise<unknown>` | PUT request |
 | `patch` | `patch(path, options?: DataOptions): Promise<unknown>` | PATCH request |
 | `del` | `del(path, options?: DataOptions): Promise<unknown>` | DELETE request |
-| `url` | `url(path: string): string` | Build full URL |
+| `url` | `url(path: string): string` | Build full URL (base trailing slash + path leading slash normalized) |
 | `base` | `get/set base: string \| null` | Base URL property |
+| `onRequest` | `onRequest(i: RequestInterceptor \| null): this` | Register request interceptor |
+| `onResponse` | `onResponse(i: ResponseInterceptor \| null): this` | Register response interceptor |
 
 ### Exported Types
 
 ```typescript
-type RequestData = Record<string, unknown> | FormData | string | null;
+type RequestData =
+  | Record<string, unknown>
+  | unknown[]
+  | FormData
+  | Blob
+  | ArrayBuffer
+  | ArrayBufferView
+  | URLSearchParams
+  | ReadableStream
+  | string
+  | number
+  | boolean
+  | null;
+
+type QueryValue =
+  | string | number | boolean
+  | (string | number | boolean)[]
+  | null | undefined;
 
 interface FetchParams {
   data?: RequestData;
   token?: string | null;
-  headers?: Record<string, string> | null;
+  headers?: HeadersInit | null;
   signal?: AbortSignal;
+  timeout?: number | null;               // ms
+  query?: Record<string, QueryValue> | null;
   credentials?: 'omit' | 'same-origin' | 'include' | null;
   raw?: boolean | null;
   assert?: boolean | null;
@@ -79,6 +100,16 @@ interface DataOptions {
 
 type ErrorMessageExtractor = (body: unknown, response: Response) => string;
 type ResponseHeaders = Record<string, string | number>;
+
+type RequestInterceptor = (
+  init: RequestInit,
+  ctx: { method: string; url: string }
+) => RequestInit | void | Promise<RequestInit | void>;
+
+type ResponseInterceptor = (
+  response: Response,
+  ctx: { method: string; url: string }
+) => Response | void | Promise<Response | void>;
 ```
 
 ### Error Classes (HTTP_ERROR namespace)
@@ -138,12 +169,26 @@ class HTTP_STATUS {
 
 ## Key Behaviors
 
-1. **Auto JSON parsing**: Response bodies are automatically parsed as JSON if possible
+1. **Auto JSON parsing**: Response bodies are parsed as JSON if possible; empty bodies (204/205) return `null`
 2. **Bearer token**: `token` param auto-adds `Authorization: Bearer {token}` header
 3. **Error throwing**: By default, non-OK responses throw HttpError (disable with `assert: false`)
 4. **Response headers**: Pass `respHeaders: {}` to capture response headers (mutated in place)
-5. **Raw response**: Use `raw: true` to get raw Response object instead of parsed body
-6. **Error priority**: per-request extractor → per-instance → global → built-in fallback
+5. **Raw response**: Use `raw: true` to get raw Response object; the caller must consume the body
+6. **Error priority**: per-request extractor → per-instance → global → built-in fallback; a throwing extractor falls through to the next priority rather than crashing
+7. **URL normalization**: `#url(path)` strips trailing `/` from base and ensures leading `/` on path, so `base + path` never produces `//` or missing `/`
+8. **Timeout**: `params.timeout` (ms) aborts via `AbortSignal.timeout`; composed with `params.signal` via `AbortSignal.any`
+9. **Query**: `params.query` object appended as URL search params; `null`/`undefined` skipped, arrays → repeated keys
+
+## Request Body Serialization
+
+| Runtime type | Sent as | Content-Type set |
+|---|---|---|
+| `null` / `undefined` | No body | — |
+| `string` | raw | caller-controlled |
+| `number` / `boolean` / plain object / array | `JSON.stringify` | `application/json` only if not already set |
+| `FormData`, `URLSearchParams`, `Blob`, `ArrayBuffer`, typed arrays, `ReadableStream` | passed to fetch unchanged | fetch handles (e.g. multipart boundary, form-urlencoded) |
+
+User-provided `Content-Type` header is always preserved.
 
 ## Development Commands
 

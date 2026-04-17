@@ -9,12 +9,41 @@ import { createHttpError } from "./error.ts";
 
 /**
  * Request body data type.
- * Supports JSON-serializable objects, FormData for file uploads, or raw strings.
+ *
+ * Plain objects and arrays are JSON-serialized (with `Content-Type: application/json`
+ * when not set). Strings are sent as-is (the caller controls `Content-Type`).
+ * Native `BodyInit` types (`FormData`, `Blob`, `ArrayBuffer`, typed arrays,
+ * `URLSearchParams`, `ReadableStream`) are passed through unchanged so that
+ * `fetch` can handle content-type negotiation (e.g. multipart boundary for
+ * FormData, `application/x-www-form-urlencoded` for URLSearchParams).
  */
-export type RequestData = object | FormData | string | null;
+export type RequestData =
+	| Record<string, unknown>
+	| unknown[]
+	| FormData
+	| Blob
+	| ArrayBuffer
+	| ArrayBufferView
+	| URLSearchParams
+	| ReadableStream
+	| string
+	| number
+	| boolean
+	| null;
+
+/** A primitive that can be serialized into a query-string value. */
+type QueryPrimitive = string | number | boolean;
+
+/** A value for {@link FetchParams.query}. `null`/`undefined` entries are skipped. */
+export type QueryValue =
+	| QueryPrimitive
+	| QueryPrimitive[]
+	| null
+	| undefined;
 
 /**
  * Deep merges two objects. Later properties overwrite earlier properties.
+ * Arrays are overwritten, not concatenated (conventional behavior).
  */
 function deepMerge<T = unknown>(
 	target: Record<string, unknown>,
@@ -45,26 +74,117 @@ function isObject(item: unknown): item is Record<string, unknown> {
 	return item !== null && typeof item === "object" && !Array.isArray(item);
 }
 
+/**
+ * Returns true for body types that native `fetch` knows how to serialize
+ * (including setting Content-Type where appropriate). These are passed through
+ * unchanged rather than JSON-stringified.
+ */
+function isNativeBodyInit(v: unknown): boolean {
+	if (v instanceof FormData) return true;
+	if (typeof Blob !== "undefined" && v instanceof Blob) return true;
+	if (v instanceof ArrayBuffer) return true;
+	if (ArrayBuffer.isView(v)) return true;
+	if (v instanceof URLSearchParams) return true;
+	if (typeof ReadableStream !== "undefined" && v instanceof ReadableStream) {
+		return true;
+	}
+	return false;
+}
+
+/**
+ * Appends query parameters to a URL path. Null/undefined values are skipped.
+ * Array values are emitted as repeated keys (e.g. `?tag=a&tag=b`).
+ */
+function appendQuery(
+	path: string,
+	query: Record<string, QueryValue>
+): string {
+	const sp = new URLSearchParams();
+	for (const [k, v] of Object.entries(query)) {
+		if (v === null || v === undefined) continue;
+		if (Array.isArray(v)) {
+			for (const item of v) {
+				if (item !== null && item !== undefined) sp.append(k, String(item));
+			}
+		} else {
+			sp.append(k, String(v));
+		}
+	}
+	const qs = sp.toString();
+	if (!qs) return path;
+	return path + (path.includes("?") ? "&" : "?") + qs;
+}
+
+/**
+ * Combines a user-provided AbortSignal with an optional timeout-based signal.
+ * Returns `undefined` if neither is present.
+ */
+function composeSignal(
+	userSignal: AbortSignal | undefined,
+	timeoutMs: number | undefined
+): AbortSignal | undefined {
+	if (!timeoutMs || timeoutMs <= 0) return userSignal;
+	const timeoutSignal = AbortSignal.timeout(timeoutMs);
+	if (!userSignal) return timeoutSignal;
+	// AbortSignal.any is available in Node 20+ and modern Deno.
+	if (typeof AbortSignal.any === "function") {
+		return AbortSignal.any([userSignal, timeoutSignal]);
+	}
+	// Fallback: manual composition.
+	const ctrl = new AbortController();
+	const abort = (reason: unknown) => ctrl.abort(reason);
+	if (userSignal.aborted) abort(userSignal.reason);
+	else userSignal.addEventListener("abort", () => abort(userSignal.reason));
+	if (timeoutSignal.aborted) abort(timeoutSignal.reason);
+	else
+		timeoutSignal.addEventListener("abort", () => abort(timeoutSignal.reason));
+	return ctrl.signal;
+}
+
 interface BaseParams {
 	method: "GET" | "POST" | "PATCH" | "DELETE" | "PUT";
 	path: string;
 }
 
 /**
+ * Request interceptor. Called after defaults are merged, with the final
+ * `RequestInit` and the resolved URL. May return an updated `RequestInit`
+ * (or a promise of one). Returning `undefined` keeps the original `init`.
+ */
+export type RequestInterceptor = (
+	init: RequestInit,
+	context: { method: string; url: string }
+) => RequestInit | void | Promise<RequestInit | void>;
+
+/**
+ * Response interceptor. Called before the response body is consumed.
+ * May return a replacement `Response` (e.g. retry result); returning
+ * `undefined` keeps the original. Must not consume the response body.
+ */
+export type ResponseInterceptor = (
+	response: Response,
+	context: { method: string; url: string }
+) => Response | void | Promise<Response | void>;
+
+/**
  * Parameters for fetch requests.
  */
 export interface FetchParams {
-	/** Request body data (automatically JSON stringified unless FormData). */
+	/** Request body. Plain objects/arrays are JSON-serialized; strings and native BodyInit types are passed through. */
 	data?: RequestData;
 	/** Bearer token (auto-adds `Authorization: Bearer {token}` header). */
 	token?: string | null;
 	/** Custom request headers. */
-	headers?: HeadersInit | Record<string, string> | null;
-	/** AbortSignal for request cancellation. */
+	headers?: HeadersInit | null;
+	/** AbortSignal for request cancellation. Combined with `timeout` if both are set. */
 	signal?: AbortSignal;
+	/** Abort the request after this many milliseconds. Combined with `signal`. */
+	timeout?: number | null;
+	/** Query parameters appended to the URL. Null/undefined values skipped; arrays become repeated keys. */
+	query?: Record<string, QueryValue> | null;
 	/** Credentials mode for the request. */
 	credentials?: "omit" | "same-origin" | "include" | null;
-	/** If true, returns the raw Response object instead of parsed body. */
+	/** If true, returns the raw Response object instead of parsed body. Caller must consume the body. */
 	raw?: boolean | null;
 	/** If false, does not throw on HTTP errors (default: true). */
 	assert?: boolean | null;
@@ -95,7 +215,7 @@ export type ResponseHeaders = Record<string, string | number>;
  * Options for HTTP GET requests using the new cleaner API.
  */
 export interface GetOptions {
-	/** Fetch parameters (headers, token, signal, credentials, raw, assert). */
+	/** Fetch parameters (headers, token, signal, credentials, raw, assert, timeout, query). */
 	params?: FetchParams;
 	/** Object to receive response headers (will be mutated). */
 	respHeaders?: ResponseHeaders | null;
@@ -109,7 +229,7 @@ export interface GetOptions {
 export interface DataOptions {
 	/** Request body data. */
 	data?: RequestData;
-	/** Fetch parameters (headers, token, signal, credentials, raw, assert). */
+	/** Fetch parameters (headers, token, signal, credentials, raw, assert, timeout, query). */
 	params?: FetchParams;
 	/** Object to receive response headers (will be mutated). */
 	respHeaders?: ResponseHeaders | null;
@@ -160,7 +280,6 @@ function parseGetOptions(
 	legacyErrorExtractor?: ErrorMessageExtractor | null
 ): ParsedGetOptions {
 	if (paramsOrOptions && OPTIONS_MARKER in paramsOrOptions) {
-		// New options API (explicit via opts() wrapper)
 		const o = paramsOrOptions as GetOptions;
 		return {
 			params: o.params,
@@ -168,7 +287,6 @@ function parseGetOptions(
 			errorExtractor: o.errorExtractor ?? null,
 		};
 	}
-	// Legacy positional API
 	return {
 		params: paramsOrOptions as FetchParams | undefined,
 		respHeaders: legacyRespHeaders ?? null,
@@ -188,9 +306,8 @@ function parseDataOptions(
 	if (
 		dataOrOptions &&
 		typeof dataOrOptions === "object" &&
-		OPTIONS_MARKER in dataOrOptions
+		OPTIONS_MARKER in (dataOrOptions as object)
 	) {
-		// New options API (explicit via opts() wrapper)
 		const o = dataOrOptions as DataOptions;
 		return {
 			data: o.data ?? null,
@@ -199,7 +316,6 @@ function parseDataOptions(
 			errorExtractor: o.errorExtractor ?? null,
 		};
 	}
-	// Legacy positional API
 	return {
 		data: (dataOrOptions as RequestData) ?? null,
 		params: legacyParams,
@@ -208,43 +324,52 @@ function parseDataOptions(
 	};
 }
 
-const _fetchRaw = async ({
-	method,
-	path,
-	data = null,
-	token = null,
-	headers = null,
-	signal,
-	credentials,
-}: BaseFetchParams) => {
+/**
+ * Builds the final RequestInit and serialized URL from FetchParams.
+ * Does not call fetch.
+ */
+function buildRequest(
+	params: BaseFetchParams
+): { url: string; init: RequestInit } {
+	const {
+		method,
+		path,
+		data = null,
+		token = null,
+		headers = null,
+		signal,
+		timeout,
+		query,
+		credentials,
+	} = params;
+
 	const normalizedHeaders: Record<string, string> = {};
 	if (headers) {
-		new Headers(headers as HeadersInit).forEach((value, key) => {
+		new Headers(headers).forEach((value, key) => {
 			normalizedHeaders[key] = value;
 		});
 	}
 
-	const opts: RequestInit = {
-		method,
-		credentials: credentials ?? undefined,
-		headers: normalizedHeaders,
-		signal,
-	};
+	const init: RequestInit = { method };
+	if (credentials) init.credentials = credentials;
 
-	if (data) {
-		const isObj = typeof data === "object";
+	const composedSignal = composeSignal(signal, timeout ?? undefined);
+	if (composedSignal) init.signal = composedSignal;
 
-		// FormData: multipart/form-data -- no explicit Content-Type
-		if (data instanceof FormData) {
-			opts.body = data;
-		}
-		// Cover 99% of use cases (may not fit all scenarios)
-		else {
-			// If not explicitly stated, assume JSON
-			if (isObj || !normalizedHeaders["content-type"]) {
+	// Body handling — send in order of most specific to least.
+	if (data !== null && data !== undefined) {
+		if (isNativeBodyInit(data)) {
+			// fetch knows how to serialize these and sets Content-Type as needed.
+			init.body = data as BodyInit;
+		} else if (typeof data === "string") {
+			// Raw strings are sent as-is; caller controls Content-Type.
+			init.body = data;
+		} else {
+			// Plain objects, arrays, numbers, booleans → JSON.
+			if (!normalizedHeaders["content-type"]) {
 				normalizedHeaders["content-type"] = "application/json";
 			}
-			opts.body = JSON.stringify(data);
+			init.body = JSON.stringify(data);
 		}
 	}
 
@@ -253,19 +378,50 @@ const _fetchRaw = async ({
 		normalizedHeaders["authorization"] = `Bearer ${token}`;
 	}
 
-	opts.headers = normalizedHeaders;
-	return await fetch(path, opts);
-};
+	init.headers = normalizedHeaders;
+
+	let url = path;
+	if (query) url = appendQuery(url, query);
+
+	return { url, init };
+}
 
 const _fetch = async (
 	params: BaseFetchParams,
 	respHeaders: ResponseHeaders | null = null,
 	errorMessageExtractor: ErrorMessageExtractor | null | undefined = null,
+	requestInterceptor: RequestInterceptor | null | undefined = null,
+	responseInterceptor: ResponseInterceptor | null | undefined = null,
 	_dumpParams = false
 ) => {
 	if (_dumpParams) return params;
 
-	const r = await _fetchRaw(params);
+	let { url, init } = buildRequest(params);
+
+	if (requestInterceptor) {
+		const patched = await requestInterceptor(init, {
+			method: params.method,
+			url,
+		});
+		if (patched) init = patched;
+	}
+
+	let r = await fetch(url, init);
+
+	if (responseInterceptor) {
+		const patched = await responseInterceptor(r, {
+			method: params.method,
+			url,
+		});
+		if (patched && patched !== r) {
+			// Cancel the original body so the underlying stream doesn't leak.
+			try {
+				await r.body?.cancel();
+			} catch (_e) { /* ignore */ }
+			r = patched;
+		}
+	}
+
 	if (params.raw) return r;
 
 	// Convert Headers to plain object
@@ -284,37 +440,53 @@ const _fetch = async (
 		);
 	}
 
-	let body: unknown = await r.text();
-	// prettier-ignore
-	try { body = JSON.parse(body as string); } catch (_e) { /* ignore parse errors */ }
+	const text = await r.text();
+	let body: unknown = text;
+	if (text === "") {
+		// Treat empty body (204/205 and friends) as null rather than "".
+		body = null;
+	} else {
+		// prettier-ignore
+		try { body = JSON.parse(text); } catch (_e) { /* ignore parse errors */ }
+	}
 
 	params.assert ??= true; // default is true
 
 	if (!r.ok && params.assert) {
-		// now we need to extract error message from an unknown response... this is obviously
-		// impossible unless we know what to expect, but we'll do some educated tries...
-		const extractor =
-			errorMessageExtractor ?? // provided arg
-			createHttpApi.defaultErrorMessageExtractor ?? // static default
-			// educated guess fallback
-			function (_body: unknown, _response: Response): string {
-				const b = _body as Record<string, unknown> | null;
-				let msg: string = String(
-					// try opinionated convention first
-					(b?.error as Record<string, unknown>)?.message ||
-						b?.message ||
-						b?.error ||
-						_response?.statusText ||
-						"Unknown error"
-				);
+		// Now we need to extract an error message from an unknown response shape.
+		// We try, in order: the per-call extractor, the factory/global, and a
+		// built-in guess. If a user-provided extractor throws, we must not let
+		// it replace the real HTTP error — fall back to statusText.
+		const tryExtract = (
+			fn: ErrorMessageExtractor | null | undefined
+		): string | null => {
+			if (!fn) return null;
+			try {
+				return fn(body, r);
+			} catch (_e) {
+				return null;
+			}
+		};
 
-				if (msg.length > 255) msg = `[Shortened]: ${msg.slice(0, 255)}`;
+		const builtIn: ErrorMessageExtractor = (_body, _response) => {
+			const b = _body as Record<string, unknown> | null;
+			let msg: string = String(
+				(b?.error as Record<string, unknown>)?.message ||
+					b?.message ||
+					b?.error ||
+					_response?.statusText ||
+					"Unknown error"
+			);
+			if (msg.length > 255) msg = `[Shortened]: ${msg.slice(0, 255)}`;
+			return msg;
+		};
 
-				return msg;
-			};
+		const msg =
+			tryExtract(errorMessageExtractor) ??
+			tryExtract(createHttpApi.defaultErrorMessageExtractor) ??
+			builtIn(body, r);
 
-		// adding `cause` describing more details
-		throw createHttpError(r.status, extractor(body, r), body, {
+		throw createHttpError(r.status, msg, body, {
 			method: params.method,
 			path: params.path,
 			response: {
@@ -337,6 +509,8 @@ export class HttpApi {
 		| Partial<BaseFetchParams>
 		| (() => Promise<Partial<BaseFetchParams>>);
 	#factoryErrorMessageExtractor?: ErrorMessageExtractor | null | undefined;
+	#requestInterceptor?: RequestInterceptor | null;
+	#responseInterceptor?: ResponseInterceptor | null;
 
 	constructor(
 		base?: string | null,
@@ -373,9 +547,31 @@ export class HttpApi {
 	}
 
 	#buildPath(path: string, base?: string | null): string {
-		base = `${base || ""}`;
-		path = `${path || ""}`;
-		return /^https?:/.test(path) ? path : base + path;
+		const p = `${path ?? ""}`;
+		const b = `${base ?? ""}`;
+		if (/^https?:/i.test(p)) return p;
+		if (!b) return p;
+		const baseNoTrail = b.replace(/\/+$/, "");
+		const pathLead = p.startsWith("/") ? p : `/${p}`;
+		return baseNoTrail + pathLead;
+	}
+
+	/**
+	 * Register a request interceptor. Called after defaults are merged.
+	 * Returning a new `RequestInit` replaces the original.
+	 */
+	onRequest(interceptor: RequestInterceptor | null): this {
+		this.#requestInterceptor = interceptor;
+		return this;
+	}
+
+	/**
+	 * Register a response interceptor. Called before the body is consumed.
+	 * Must not consume the body. Returning a new `Response` replaces the original.
+	 */
+	onResponse(interceptor: ResponseInterceptor | null): this {
+		this.#responseInterceptor = interceptor;
+		return this;
 	}
 
 	/**
@@ -388,24 +584,16 @@ export class HttpApi {
 	 *
 	 * @example
 	 * ```ts
-	 * const data = await api.get('/users', {
+	 * const data = await api.get('/users', opts({
 	 *   params: { headers: { 'X-Custom': 'value' } },
 	 *   respHeaders: {}
-	 * });
+	 * }));
 	 * ```
 	 */
 	async get<T = unknown>(path: string, options: GetOptions): Promise<T>;
 
 	/**
 	 * Performs a GET request (legacy API).
-	 *
-	 * @param path - The request path (will be appended to base URL if set).
-	 * @param params - Optional fetch parameters.
-	 * @param respHeaders - Optional object to be mutated with response headers.
-	 * @param errorMessageExtractor - Optional custom error message extractor.
-	 * @param _dumpParams - Internal parameter for testing.
-	 * @returns The response body (auto-parsed as JSON if possible), or Response if `raw: true`.
-	 * @throws {HttpError} When the response is not OK and `assert` is true (default).
 	 */
 	async get<T = unknown>(
 		path: string,
@@ -433,40 +621,19 @@ export class HttpApi {
 			this.#merge(await this.#getDefs(), { ...params, method: "GET", path }),
 			headers,
 			errorExtractor ?? this.#factoryErrorMessageExtractor,
+			this.#requestInterceptor,
+			this.#responseInterceptor,
 			_dumpParams
 		);
 	}
 
 	/**
 	 * Performs a POST request (new options API - recommended).
-	 *
-	 * @param path - The request path (will be appended to base URL if set).
-	 * @param options - Request options object including data and params.
-	 * @returns The response body (auto-parsed as JSON if possible), or Response if `raw: true`.
-	 * @throws {HttpError} When the response is not OK and `assert` is true (default).
-	 *
-	 * @example
-	 * ```ts
-	 * await api.post('/users', {
-	 *   data: { name: 'John' },
-	 *   params: { headers: { 'X-Custom': 'value' } },
-	 *   respHeaders: {}
-	 * });
-	 * ```
 	 */
 	async post<T = unknown>(path: string, options: DataOptions): Promise<T>;
 
 	/**
 	 * Performs a POST request (legacy API).
-	 *
-	 * @param path - The request path (will be appended to base URL if set).
-	 * @param data - Request body data.
-	 * @param params - Optional fetch parameters.
-	 * @param respHeaders - Optional object to be mutated with response headers.
-	 * @param errorMessageExtractor - Optional custom error message extractor.
-	 * @param _dumpParams - Internal parameter for testing.
-	 * @returns The response body (auto-parsed as JSON if possible), or Response if `raw: true`.
-	 * @throws {HttpError} When the response is not OK and `assert` is true (default).
 	 */
 	async post<T = unknown>(
 		path: string,
@@ -485,28 +652,13 @@ export class HttpApi {
 		errorMessageExtractor?: ErrorMessageExtractor | null,
 		_dumpParams = false
 	): Promise<unknown> {
-		const {
-			data,
-			params: fetchParams,
-			respHeaders: headers,
-			errorExtractor,
-		} = parseDataOptions(
+		return await this.#body(
+			"POST",
+			path,
 			dataOrOptions,
 			params,
 			respHeaders,
-			errorMessageExtractor
-		);
-
-		path = this.#buildPath(path, this.#base);
-		return _fetch(
-			this.#merge(await this.#getDefs(), {
-				...(fetchParams || {}),
-				data,
-				method: "POST",
-				path,
-			}),
-			headers,
-			errorExtractor ?? this.#factoryErrorMessageExtractor,
+			errorMessageExtractor,
 			_dumpParams
 		);
 	}
@@ -530,28 +682,13 @@ export class HttpApi {
 		errorMessageExtractor?: ErrorMessageExtractor | null,
 		_dumpParams = false
 	): Promise<unknown> {
-		const {
-			data,
-			params: fetchParams,
-			respHeaders: headers,
-			errorExtractor,
-		} = parseDataOptions(
+		return await this.#body(
+			"PUT",
+			path,
 			dataOrOptions,
 			params,
 			respHeaders,
-			errorMessageExtractor
-		);
-
-		path = this.#buildPath(path, this.#base);
-		return _fetch(
-			this.#merge(await this.#getDefs(), {
-				...(fetchParams || {}),
-				data,
-				method: "PUT",
-				path,
-			}),
-			headers,
-			errorExtractor ?? this.#factoryErrorMessageExtractor,
+			errorMessageExtractor,
 			_dumpParams
 		);
 	}
@@ -575,28 +712,13 @@ export class HttpApi {
 		errorMessageExtractor?: ErrorMessageExtractor | null,
 		_dumpParams = false
 	): Promise<unknown> {
-		const {
-			data,
-			params: fetchParams,
-			respHeaders: headers,
-			errorExtractor,
-		} = parseDataOptions(
+		return await this.#body(
+			"PATCH",
+			path,
 			dataOrOptions,
 			params,
 			respHeaders,
-			errorMessageExtractor
-		);
-
-		path = this.#buildPath(path, this.#base);
-		return _fetch(
-			this.#merge(await this.#getDefs(), {
-				...(fetchParams || {}),
-				data,
-				method: "PATCH",
-				path,
-			}),
-			headers,
-			errorExtractor ?? this.#factoryErrorMessageExtractor,
+			errorMessageExtractor,
 			_dumpParams
 		);
 	}
@@ -624,6 +746,26 @@ export class HttpApi {
 		errorMessageExtractor?: ErrorMessageExtractor | null,
 		_dumpParams = false
 	): Promise<unknown> {
+		return await this.#body(
+			"DELETE",
+			path,
+			dataOrOptions,
+			params,
+			respHeaders,
+			errorMessageExtractor,
+			_dumpParams
+		);
+	}
+
+	async #body(
+		method: BaseParams["method"],
+		path: string,
+		dataOrOptions: RequestData | DataOptions | undefined,
+		params: FetchParams | undefined,
+		respHeaders: ResponseHeaders | null | undefined,
+		errorMessageExtractor: ErrorMessageExtractor | null | undefined,
+		_dumpParams: boolean
+	): Promise<unknown> {
 		const {
 			data,
 			params: fetchParams,
@@ -641,11 +783,13 @@ export class HttpApi {
 			this.#merge(await this.#getDefs(), {
 				...(fetchParams || {}),
 				data,
-				method: "DELETE",
+				method,
 				path,
 			}),
 			headers,
 			errorExtractor ?? this.#factoryErrorMessageExtractor,
+			this.#requestInterceptor,
+			this.#responseInterceptor,
 			_dumpParams
 		);
 	}
@@ -705,6 +849,9 @@ export function createHttpApi(
  * Global default error message extractor.
  * Applied to all requests unless overridden at instance or request level.
  * Priority: per-request → per-instance → global → built-in fallback.
+ *
+ * A throwing extractor will not crash the call — the next priority level is
+ * used as a fallback.
  *
  * @example
  * ```ts

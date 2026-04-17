@@ -32,6 +32,9 @@ export {
 	type ErrorMessageExtractor,
 	type ResponseHeaders,
 	type RequestData,
+	type QueryValue,
+	type RequestInterceptor,
+	type ResponseInterceptor,
 } from "./api.ts";
 export { HTTP_ERROR, createHttpError, getErrorMessage } from "./error.ts";
 export { HTTP_STATUS } from "./status.ts";

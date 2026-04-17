@@ -7,6 +7,10 @@ Complete API reference for `@marianmeres/http-utils`.
 - [createHttpApi](#createhttpapi)
 - [opts](#opts)
 - [HttpApi Class](#httpapi-class)
+- [Request Bodies](#request-bodies)
+- [Query Parameters](#query-parameters)
+- [Timeouts and Cancellation](#timeouts-and-cancellation)
+- [Interceptors](#interceptors)
 - [Types](#types)
 - [HTTP Errors](#http-errors)
 - [HTTP Status Codes](#http-status-codes)
@@ -208,7 +212,7 @@ Performs a DELETE request. Same signature as `post<T>()`.
 
 #### `url(path)`
 
-Builds the full URL from a path.
+Builds the full URL from a path. Base trailing slashes and missing path leading slashes are normalized so there is exactly one `/` between base and path.
 
 ```ts
 url(path: string): string
@@ -217,9 +221,21 @@ url(path: string): string
 **Example:**
 ```ts
 const api = createHttpApi("https://api.example.com");
-api.url("/users"); // "https://api.example.com/users"
-api.url("https://other.com/path"); // "https://other.com/path" (absolute URLs returned as-is)
+api.url("/users");                  // "https://api.example.com/users"
+api.url("users");                   // "https://api.example.com/users" (leading slash added)
+api.url("https://other.com/path");  // "https://other.com/path" (absolute URLs returned as-is)
+
+const api2 = createHttpApi("https://api.example.com/v1/");
+api2.url("/users");                 // "https://api.example.com/v1/users" (no double slash)
 ```
+
+#### `onRequest(interceptor)`
+
+Registers a request interceptor. See [Interceptors](#interceptors).
+
+#### `onResponse(interceptor)`
+
+Registers a response interceptor. See [Interceptors](#interceptors).
 
 ### Properties
 
@@ -234,14 +250,160 @@ set base(v: string | null | undefined)
 
 ---
 
+## Request Bodies
+
+The `data` parameter is serialized based on its runtime type:
+
+| Runtime type | Behavior | Content-Type |
+|---|---|---|
+| `null` / `undefined` | No body sent | — |
+| `string` | Sent as-is | Caller's (fetch may default to `text/plain;charset=UTF-8`) |
+| `number` / `boolean` | `JSON.stringify`'d (e.g. `0` → `"0"`) | `application/json` if not set |
+| Plain object / array | `JSON.stringify`'d | `application/json` if not set |
+| `FormData` | Passed to fetch unchanged | `multipart/form-data; boundary=…` (fetch auto-sets) |
+| `URLSearchParams` | Passed to fetch unchanged | `application/x-www-form-urlencoded;charset=UTF-8` (fetch auto-sets) |
+| `Blob` | Passed to fetch unchanged | From the Blob's `.type` |
+| `ArrayBuffer` / typed arrays | Passed to fetch unchanged | Caller's (none by default) |
+| `ReadableStream` | Passed to fetch unchanged | Caller's |
+
+If you explicitly set `Content-Type` in `headers`, it is always respected — even for object data. Objects are still JSON-stringified; set your own body (e.g. via a string) if you need a non-JSON serialization.
+
+```ts
+// Plain object → JSON
+await api.post("/users", { name: "John" });
+
+// Respect user Content-Type
+await api.post("/graph", { query: "{ me { id } }" }, {
+  headers: { "content-type": "application/graphql+json" },
+});
+
+// FormData (file upload)
+const fd = new FormData();
+fd.append("file", fileBlob);
+await api.post("/upload", fd);
+
+// URL-encoded form
+await api.post("/login", new URLSearchParams({ user: "a", pass: "b" }));
+
+// Raw string body
+await api.post("/logs", "raw log line", {
+  headers: { "content-type": "text/plain" },
+});
+```
+
+---
+
+## Query Parameters
+
+Use `params.query` to append query-string parameters to the URL.
+
+```ts
+await api.get("/search", {
+  query: {
+    q: "hello world",
+    page: 1,
+    active: true,
+    tag: ["a", "b"],      // → ?tag=a&tag=b
+    ignored: null,         // null and undefined are skipped
+  },
+});
+// GET /search?q=hello+world&page=1&active=true&tag=a&tag=b
+```
+
+If the path already contains `?`, query params are appended with `&`.
+
+---
+
+## Timeouts and Cancellation
+
+`params.timeout` (in milliseconds) aborts the request via `AbortSignal.timeout`. It composes with a user-provided `signal` — whichever fires first aborts the request.
+
+```ts
+// Simple timeout
+await api.get("/slow", { timeout: 5000 });
+
+// Timeout + cancellable signal
+const ctrl = new AbortController();
+await api.get("/slow", {
+  timeout: 10_000,
+  signal: ctrl.signal,
+});
+// ctrl.abort() or timeout — whichever first — cancels the request.
+```
+
+Uses `AbortSignal.any` when available (Node 20+, modern Deno). Falls back to manual composition otherwise.
+
+---
+
+## Interceptors
+
+Register per-instance hooks that run around each request.
+
+### `onRequest(interceptor)`
+
+Called after defaults are merged, with the final `RequestInit` and resolved URL. Return a new `RequestInit` to replace the original, or `void` / `undefined` to keep it.
+
+```ts
+const api = createHttpApi("https://api.example.com").onRequest((init, ctx) => {
+  console.log(`[http] → ${ctx.method} ${ctx.url}`);
+  const h = new Headers(init.headers);
+  h.set("x-trace-id", crypto.randomUUID());
+  return { ...init, headers: h };
+});
+```
+
+### `onResponse(interceptor)`
+
+Called before the body is consumed. **Must not read the body.** Return a replacement `Response` (e.g. after a retry) or `void` to keep the original. If you return a replacement, the original's body is cancelled for you.
+
+```ts
+api.onResponse(async (resp, ctx) => {
+  console.log(`[http] ← ${ctx.method} ${ctx.url} ${resp.status}`);
+  if (resp.status === 401) {
+    await refreshToken();
+    // return a new fetch() if you want to retry
+  }
+});
+```
+
+Only one interceptor of each kind is supported per instance. Passing `null` clears it.
+
+---
+
 ## Types
 
 ### RequestData
 
-Request body data type.
+Request body data type. See [Request Bodies](#request-bodies) for serialization rules.
 
 ```ts
-type RequestData = Record<string, unknown> | FormData | string | null;
+type RequestData =
+  | Record<string, unknown>
+  | unknown[]
+  | FormData
+  | Blob
+  | ArrayBuffer
+  | ArrayBufferView
+  | URLSearchParams
+  | ReadableStream
+  | string
+  | number
+  | boolean
+  | null;
+```
+
+### QueryValue
+
+A value for `FetchParams.query`. `null` / `undefined` entries are skipped; arrays emit repeated keys.
+
+```ts
+type QueryValue =
+  | string
+  | number
+  | boolean
+  | (string | number | boolean)[]
+  | null
+  | undefined;
 ```
 
 ### FetchParams
@@ -250,17 +412,21 @@ Parameters for fetch requests.
 
 ```ts
 interface FetchParams {
-  /** Request body data (automatically JSON stringified unless FormData). */
+  /** Request body. See "Request Bodies" for serialization rules. */
   data?: RequestData;
   /** Bearer token (auto-adds `Authorization: Bearer {token}` header). */
   token?: string | null;
   /** Custom request headers. */
-  headers?: Record<string, string> | null;
-  /** AbortSignal for request cancellation. */
+  headers?: HeadersInit | null;
+  /** AbortSignal for request cancellation. Combined with `timeout` if both are set. */
   signal?: AbortSignal;
+  /** Abort the request after this many milliseconds. Combined with `signal`. */
+  timeout?: number | null;
+  /** Query parameters appended to the URL. */
+  query?: Record<string, QueryValue> | null;
   /** Credentials mode for the request. */
   credentials?: 'omit' | 'same-origin' | 'include' | null;
-  /** If true, returns the raw Response object instead of parsed body. */
+  /** If true, returns the raw Response object instead of parsed body. Caller must consume the body. */
   raw?: boolean | null;
   /** If false, does not throw on HTTP errors (default: true). */
   assert?: boolean | null;
@@ -313,10 +479,28 @@ Special keys added after request:
 
 ### ErrorMessageExtractor
 
-Function to extract error messages from failed HTTP responses.
+Function to extract error messages from failed HTTP responses. If the extractor throws, the call falls back to the next-priority extractor (per-instance → global → built-in) instead of crashing.
 
 ```ts
 type ErrorMessageExtractor = (body: unknown, response: Response) => string;
+```
+
+### RequestInterceptor
+
+```ts
+type RequestInterceptor = (
+  init: RequestInit,
+  context: { method: string; url: string }
+) => RequestInit | void | Promise<RequestInit | void>;
+```
+
+### ResponseInterceptor
+
+```ts
+type ResponseInterceptor = (
+  response: Response,
+  context: { method: string; url: string }
+) => Response | void | Promise<Response | void>;
 ```
 
 ---
