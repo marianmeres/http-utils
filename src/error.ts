@@ -302,11 +302,19 @@ export const createHttpError = (
  *
  * Priority order:
  * 1. e.cause.message / e.cause.code / e.cause (if string)
- * 2. e.body.error.message / e.body.message / e.body.error / e.body (if string)
+ *    / e.cause.detail (RFC 7807) / e.cause.error_description (OAuth 2)
+ *    / e.cause.error.error_description / e.cause.error.detail
+ * 2. e.body.error.message / e.body.message
+ *    / e.body.error.error_description / e.body.error.detail
+ *    / e.body.detail (RFC 7807 / DRF / FastAPI) / e.body.title (RFC 7807)
+ *    / e.body.error_description (OAuth 2)
+ *    / e.body.errors[0] (JSON:API; first entry's detail/title/message, or string)
+ *    / e.body.error / e.body (if string)
  * 3. e.message
- * 4. e.name
- * 5. e.toString()
- * 6. "Unknown Error"
+ * 4. e.code (Node.js: ECONNREFUSED, ENOENT, ...)
+ * 5. e.name
+ * 6. e.toString()
+ * 7. "Unknown Error"
  *
  * @param e - The error to extract a message from (can be any type).
  * @param stripErrorPrefix - Whether to remove "Error: " prefix from the message (default: true).
@@ -330,13 +338,37 @@ export const getErrorMessage = (e: unknown, stripErrorPrefix = true): string => 
 		(typeof cause === 'object' ? cause?.message : null) ||
 		(typeof cause === 'object' ? cause?.code : null) ||
 		(typeof cause === 'string' ? cause : null) ||
+		// additional well-known cause shapes (RFC 7807, OAuth 2, nested OAuth)
+		(typeof cause === 'object' ? cause?.detail : null) ||
+		(typeof cause === 'object' ? cause?.error_description : null) ||
+		(typeof cause === 'object' ? (cause?.error as Record<string, unknown>)?.error_description : null) ||
+		(typeof cause === 'object' ? (cause?.error as Record<string, unknown>)?.detail : null) ||
 		// non-standard "body" is this package's HttpError prop
 		(typeof body === 'object' ? (body?.error as Record<string, unknown>)?.message : null) ||
 		(typeof body === 'object' ? body?.message : null) ||
+		// nested under body.error (OAuth-style nested + RFC 7807 nested)
+		(typeof body === 'object' ? (body?.error as Record<string, unknown>)?.error_description : null) ||
+		(typeof body === 'object' ? (body?.error as Record<string, unknown>)?.detail : null) ||
+		// RFC 7807 (Problem Details) / DRF / FastAPI
+		(typeof body === 'object' ? body?.detail : null) ||
+		(typeof body === 'object' ? body?.title : null) ||
+		// OAuth 2 (RFC 6749) — must precede `body.error` so error_description wins over the error code
+		(typeof body === 'object' ? body?.error_description : null) ||
+		// JSON:API / generic errors[] — first entry's detail/title/message, else string
+		(typeof body === 'object' && Array.isArray(body?.errors)
+			? (typeof body.errors[0] === 'string'
+				? body.errors[0]
+				: ((body.errors[0] as Record<string, unknown>)?.detail
+					|| (body.errors[0] as Record<string, unknown>)?.title
+					|| (body.errors[0] as Record<string, unknown>)?.message))
+			: null) ||
+		// fallback: body.error as plain string (e.g. OAuth error code without description)
 		(typeof body === 'object' ? body?.error : null) ||
 		(typeof body === 'string' ? body : null) ||
 		// the common message from Error ctor (e.g. "Foo" if new TypeError("Foo"))
 		err?.message ||
+		// Node.js error code fallback (e.g. "ECONNREFUSED") when message is empty
+		err?.code ||
 		// the Error class name (e.g. TypeError)
 		err?.name ||
 		// this should handle (almost) everything else (mainly if e is not an Error instance)

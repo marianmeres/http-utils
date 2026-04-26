@@ -101,3 +101,74 @@ Deno.test("getErrorMessage", () => {
 	e = createHttpError(123, "Hey", "because body says");
 	assert(getErrorMessage(e) === "because body says");
 });
+
+Deno.test("getErrorMessage - well-known API conventions", () => {
+	// OAuth 2 (RFC 6749): error_description preferred over error code
+	let e = createHttpError(400, null, {
+		error: "invalid_grant",
+		error_description: "Token expired",
+	});
+	assert(getErrorMessage(e) === "Token expired");
+
+	// RFC 7807 Problem Details / DRF / FastAPI
+	e = createHttpError(422, null, { detail: "validation failed" });
+	assert(getErrorMessage(e) === "validation failed");
+
+	// RFC 7807 title fallback when no detail
+	e = createHttpError(422, null, { title: "Unprocessable" });
+	assert(getErrorMessage(e) === "Unprocessable");
+
+	// JSON:API errors[] with detail
+	e = createHttpError(400, null, { errors: [{ detail: "field x required" }] });
+	assert(getErrorMessage(e) === "field x required");
+
+	// JSON:API errors[] with title only
+	e = createHttpError(400, null, { errors: [{ title: "Bad Field" }] });
+	assert(getErrorMessage(e) === "Bad Field");
+
+	// JSON:API errors[] with message
+	e = createHttpError(400, null, { errors: [{ message: "msg from arr" }] });
+	assert(getErrorMessage(e) === "msg from arr");
+
+	// Plain string errors[]
+	e = createHttpError(400, null, { errors: ["plain string"] });
+	assert(getErrorMessage(e) === "plain string");
+
+	// Nested OAuth under body.error
+	e = createHttpError(400, null, {
+		error: { error_description: "nested oauth msg" },
+	});
+	assert(getErrorMessage(e) === "nested oauth msg");
+
+	// Nested RFC 7807 detail under body.error
+	e = createHttpError(400, null, { error: { detail: "nested detail" } });
+	assert(getErrorMessage(e) === "nested detail");
+
+	// Cause-tier mirror: RFC 7807 detail in cause
+	e = createHttpError(500, "msg", null, { detail: "deep reason" });
+	assert(getErrorMessage(e) === "deep reason");
+
+	// Cause-tier mirror: OAuth 2 error_description in cause
+	e = createHttpError(500, "msg", null, {
+		error: "x",
+		error_description: "deep oauth",
+	});
+	assert(getErrorMessage(e) === "deep oauth");
+
+	// Node.js error code fallback (no message)
+	const nodeErr = Object.assign(new Error(), { code: "ECONNREFUSED" });
+	assert(getErrorMessage(nodeErr) === "ECONNREFUSED");
+
+	// err.message still wins over err.code when present
+	const nodeErr2 = Object.assign(new Error("connect failed"), {
+		code: "ECONNREFUSED",
+	});
+	assert(getErrorMessage(nodeErr2) === "connect failed");
+
+	// existing body.error.message still wins over new paths (BC check)
+	e = createHttpError(400, null, {
+		error: { message: "primary", error_description: "secondary" },
+		detail: "tertiary",
+	});
+	assert(getErrorMessage(e) === "primary");
+});
