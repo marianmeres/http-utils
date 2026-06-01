@@ -162,7 +162,8 @@ function getErrorMessage(e: unknown, stripErrorPrefix?: boolean): string;
 // AbortError/TimeoutError pass through untouched. Used internally by HttpApi.
 // 3rd arg is a label string OR FetchOrThrowOptions { what?, onRequest?, onError? } (pure observers; a string normalizes to { what }).
 // onRequest fires before dispatch (throw => request not sent). onError fires on every failure
-//   with kind: "abort" | "timeout" | "network" (throw => swallowed, real error preserved).
+//   with { error, url, what?, kind: "abort"|"timeout"|"network", reason } (reason via getErrorMessage;
+//   throw => swallowed, real error preserved).
 // Global defaults (overridable per call; resolution: per-call ?? global; instruments HttpApi too):
 //   fetchOrThrow.global.onRequest / fetchOrThrow.global.onError
 function fetchOrThrow(

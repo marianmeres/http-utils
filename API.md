@@ -746,6 +746,8 @@ interface FetchOrThrowOptions {
 		url: string;
 		what?: string;
 		kind: "abort" | "timeout" | "network";
+		/** Human-readable reason (via `getErrorMessage`); always a string. */
+		reason: string;
 	}) => void;
 }
 
@@ -773,8 +775,8 @@ Set defaults once on `fetchOrThrow.global`; per-call options win (resolution is
 ```ts
 // app-wide defaults (also fire for every HttpApi request)
 fetchOrThrow.global.onRequest = ({ method, url }) => console.debug(`→ ${method} ${url}`);
-fetchOrThrow.global.onError = ({ url, kind }) =>
-	kind !== "abort" && console.error(`✗ ${url}`);
+fetchOrThrow.global.onError = ({ url, kind, reason }) =>
+	kind !== "abort" && console.error(`✗ ${url}: ${reason}`);
 
 // per-call object form (overrides the global onRequest for this call only)
 await fetchOrThrow(url, init, { what: "Token issuer", onRequest: () => {} });

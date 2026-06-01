@@ -97,7 +97,7 @@ Deno.test("fetchOrThrow onRequest reports the method (from init and from Request
 
 Deno.test("fetchOrThrow onError fires with kind 'network' and still throws", async () => {
 	let captured:
-		| { error: unknown; url: string; what?: string; kind: string }
+		| { error: unknown; url: string; what?: string; kind: string; reason: string }
 		| undefined;
 	try {
 		await fetchOrThrow(DEAD_HOST, undefined, {
@@ -113,13 +113,17 @@ Deno.test("fetchOrThrow onError fires with kind 'network' and still throws", asy
 		assert(captured!.error instanceof HTTP_ERROR.NetworkError);
 		assert(captured!.error === e); // the very error that propagated
 		assert(captured!.url.includes("does-not-exist.invalid"));
+		// the parsed reason is provided and matches what the error message embeds
+		assert(captured!.reason.length > 0);
+		assert(captured!.reason !== "fetch failed");
+		assert((e as Error).message.endsWith(captured!.reason));
 	}
 });
 
 Deno.test("fetchOrThrow onError fires with kind 'abort' and preserves the original error", async () => {
 	const controller = new AbortController();
 	controller.abort();
-	let captured: { error: unknown; kind: string } | undefined;
+	let captured: { error: unknown; kind: string; reason: string } | undefined;
 	try {
 		await fetchOrThrow(DEAD_HOST, { signal: controller.signal }, {
 			onError: (i) => (captured = i),
@@ -132,6 +136,8 @@ Deno.test("fetchOrThrow onError fires with kind 'abort' and preserves the origin
 		assert(captured);
 		assertEquals(captured!.kind, "abort");
 		assert(captured!.error === e);
+		// reason is still provided for non-network kinds (lazily from the error)
+		assert(captured!.reason.length > 0);
 	}
 });
 

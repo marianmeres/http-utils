@@ -240,8 +240,8 @@ where neither a response nor an error ever arrives. Set defaults once on
 ```ts
 // app-wide defaults (also fire for every HttpApi request)
 fetchOrThrow.global.onRequest = ({ method, url }) => console.debug(`→ ${method} ${url}`);
-fetchOrThrow.global.onError = ({ url, kind }) =>
-	kind !== "abort" && console.error(`✗ ${url}`); // kind: "abort" | "timeout" | "network"
+fetchOrThrow.global.onError = ({ url, kind, reason }) =>
+	kind !== "abort" && console.error(`✗ ${url}: ${reason}`); // kind: "abort" | "timeout" | "network"
 
 // per-call override (here: silence the global tracer for one call)
 await fetchOrThrow(url, init, { what: "Token issuer", onRequest: () => {} });

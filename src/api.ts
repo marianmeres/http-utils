@@ -418,6 +418,14 @@ export interface FetchOrThrowOptions {
 		url: string;
 		what?: string;
 		kind: "abort" | "timeout" | "network";
+		/**
+		 * Human-readable failure reason, extracted via `getErrorMessage`. For a
+		 * `network` failure this is the resolved transport reason embedded in the
+		 * `NetworkError` message (e.g. `"ENOTFOUND"`); for `abort`/`timeout` it is
+		 * the message of the original error. Always a string — handy for structured
+		 * logging without re-parsing `error` yourself.
+		 */
+		reason: string;
 	}) => void;
 }
 
@@ -442,9 +450,10 @@ const _FOT_GLOBAL: FetchOrThrowGlobalOptions =
 	});
 
 /**
- * Invoke an `onError` observer defensively: `url` is only computed when a hook
- * is present, and a throwing hook is swallowed so it can never replace the real
- * error that is about to propagate.
+ * Invoke an `onError` observer defensively: `url` and `reason` are only computed
+ * when a hook is present (the network path passes its already-resolved `reason`
+ * to avoid a second extraction), and a throwing hook is swallowed so it can never
+ * replace the real error that is about to propagate.
  */
 function _notifyFetchError(
 	hook: FetchOrThrowOptions["onError"],
@@ -453,10 +462,17 @@ function _notifyFetchError(
 	input: Parameters<typeof fetch>[0],
 	what: string | undefined,
 	kind: "abort" | "timeout" | "network",
+	reason?: string,
 ): void {
 	if (!hook) return;
 	try {
-		hook({ error, url: describe(input), what, kind });
+		hook({
+			error,
+			url: describe(input),
+			what,
+			kind,
+			reason: reason ?? getErrorMessage(error),
+		});
 	} catch {
 		/* observer hooks must not alter control flow */
 	}
@@ -503,8 +519,8 @@ function _notifyFetchError(
  *
  * // Configure tracing once, app-wide (also instruments the HttpApi client):
  * fetchOrThrow.global.onRequest = ({ method, url }) => console.debug(`→ ${method} ${url}`);
- * fetchOrThrow.global.onError = ({ url, kind }) =>
- *   kind !== "abort" && console.error(`✗ ${url}`);
+ * fetchOrThrow.global.onError = ({ url, kind, reason }) =>
+ *   kind !== "abort" && console.error(`✗ ${url}: ${reason}`);
  *
  * try {
  *   const res = await fetchOrThrow("https://issuer.example.com/jwks", undefined, "Token issuer");
@@ -559,7 +575,7 @@ export async function fetchOrThrow(
 			? `${label} unreachable (${url}): ${reason}`
 			: `Network request to ${url} failed: ${reason}`;
 		const networkError = new NetworkError(message, { cause: underlying });
-		_notifyFetchError(onError, networkError, () => url, input, label, kind);
+		_notifyFetchError(onError, networkError, () => url, input, label, kind, reason);
 		throw networkError;
 	}
 }
