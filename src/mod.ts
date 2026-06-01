@@ -23,19 +23,19 @@
  */
 
 export {
-	HttpApi,
 	createHttpApi,
-	fetchOrThrow,
-	opts,
 	type DataOptions,
-	type GetOptions,
-	type FetchParams,
 	type ErrorMessageExtractor,
-	type ResponseHeaders,
-	type RequestData,
+	fetchOrThrow,
+	type FetchParams,
+	type GetOptions,
+	HttpApi,
+	opts,
 	type QueryValue,
+	type RequestData,
 	type RequestInterceptor,
+	type ResponseHeaders,
 	type ResponseInterceptor,
 } from "./api.ts";
-export { HTTP_ERROR, createHttpError, getErrorMessage } from "./error.ts";
+export { createHttpError, getErrorMessage, HTTP_ERROR } from "./error.ts";
 export { HTTP_STATUS } from "./status.ts";

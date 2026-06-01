@@ -5,7 +5,7 @@
  * Provides specific error classes for well-known HTTP status codes.
  */
 
-import { HTTP_STATUS } from './status.ts';
+import { HTTP_STATUS } from "./status.ts";
 
 /**
  * Base HTTP error class. Extends Error with HTTP-specific properties.
@@ -25,7 +25,7 @@ import { HTTP_STATUS } from './status.ts';
  * ```
  */
 class HttpError extends Error {
-	public override name = 'HttpError';
+	public override name = "HttpError";
 	/** HTTP status code (e.g., 404, 500) */
 	public status: number = HTTP_STATUS.ERROR_SERVER.INTERNAL_SERVER_ERROR.CODE;
 	/** HTTP status text (e.g., "Not Found", "Internal Server Error") */
@@ -38,84 +38,84 @@ class HttpError extends Error {
 
 /** HTTP 400 Bad Request error. */
 class BadRequest extends HttpError {
-	public override name = 'HttpBadRequestError';
+	public override name = "HttpBadRequestError";
 	public override status = HTTP_STATUS.ERROR_CLIENT.BAD_REQUEST.CODE;
 	public override statusText = HTTP_STATUS.ERROR_CLIENT.BAD_REQUEST.TEXT;
 }
 
 /** HTTP 401 Unauthorized error. */
 class Unauthorized extends HttpError {
-	public override name = 'HttpUnauthorizedError';
+	public override name = "HttpUnauthorizedError";
 	public override status = HTTP_STATUS.ERROR_CLIENT.UNAUTHORIZED.CODE;
 	public override statusText = HTTP_STATUS.ERROR_CLIENT.UNAUTHORIZED.TEXT;
 }
 
 /** HTTP 403 Forbidden error. */
 class Forbidden extends HttpError {
-	public override name = 'HttpForbiddenError';
+	public override name = "HttpForbiddenError";
 	public override status = HTTP_STATUS.ERROR_CLIENT.FORBIDDEN.CODE;
 	public override statusText = HTTP_STATUS.ERROR_CLIENT.FORBIDDEN.TEXT;
 }
 
 /** HTTP 404 Not Found error. */
 class NotFound extends HttpError {
-	public override name = 'HttpNotFoundError';
+	public override name = "HttpNotFoundError";
 	public override status = HTTP_STATUS.ERROR_CLIENT.NOT_FOUND.CODE;
 	public override statusText = HTTP_STATUS.ERROR_CLIENT.NOT_FOUND.TEXT;
 }
 
 /** HTTP 405 Method Not Allowed error. */
 class MethodNotAllowed extends HttpError {
-	public override name = 'HttpMethodNotAllowedError';
+	public override name = "HttpMethodNotAllowedError";
 	public override status = HTTP_STATUS.ERROR_CLIENT.METHOD_NOT_ALLOWED.CODE;
 	public override statusText = HTTP_STATUS.ERROR_CLIENT.METHOD_NOT_ALLOWED.TEXT;
 }
 
 /** HTTP 408 Request Timeout error. */
 class RequestTimeout extends HttpError {
-	public override name = 'HttpRequestTimeoutError';
+	public override name = "HttpRequestTimeoutError";
 	public override status = HTTP_STATUS.ERROR_CLIENT.REQUEST_TIMEOUT.CODE;
 	public override statusText = HTTP_STATUS.ERROR_CLIENT.REQUEST_TIMEOUT.TEXT;
 }
 
 /** HTTP 409 Conflict error. */
 class Conflict extends HttpError {
-	public override name = 'HttpConflictError';
+	public override name = "HttpConflictError";
 	public override status = HTTP_STATUS.ERROR_CLIENT.CONFLICT.CODE;
 	public override statusText = HTTP_STATUS.ERROR_CLIENT.CONFLICT.TEXT;
 }
 
 /** HTTP 410 Gone error. */
 class Gone extends HttpError {
-	public override name = 'HttpGoneError';
+	public override name = "HttpGoneError";
 	public override status = HTTP_STATUS.ERROR_CLIENT.GONE.CODE;
 	public override statusText = HTTP_STATUS.ERROR_CLIENT.GONE.TEXT;
 }
 
 /** HTTP 411 Length Required error. */
 class LengthRequired extends HttpError {
-	public override name = 'HttpLengthRequiredError';
+	public override name = "HttpLengthRequiredError";
 	public override status = HTTP_STATUS.ERROR_CLIENT.LENGTH_REQUIRED.CODE;
 	public override statusText = HTTP_STATUS.ERROR_CLIENT.LENGTH_REQUIRED.TEXT;
 }
 
 /** HTTP 422 Unprocessable Content error. */
 class UnprocessableContent extends HttpError {
-	public override name = 'HttpUnprocessableContentError';
+	public override name = "HttpUnprocessableContentError";
 	public override status = HTTP_STATUS.ERROR_CLIENT.UNPROCESSABLE_CONTENT.CODE;
 	public override statusText = HTTP_STATUS.ERROR_CLIENT.UNPROCESSABLE_CONTENT.TEXT;
 }
 
 /** HTTP 429 Too Many Requests error. */
 class TooManyRequests extends HttpError {
-	public override name = 'HttpTooManyRequestsError';
+	public override name = "HttpTooManyRequestsError";
 	public override status = HTTP_STATUS.ERROR_CLIENT.TOO_MANY_REQUESTS.CODE;
 	public override statusText = HTTP_STATUS.ERROR_CLIENT.TOO_MANY_REQUESTS.TEXT;
 }
 
 /** HTTP 418 I'm a Teapot error. */
 class ImATeapot extends HttpError {
-	public override name = 'HttpImATeapotError';
+	public override name = "HttpImATeapotError";
 	public override status = HTTP_STATUS.ERROR_CLIENT.IM_A_TEAPOT.CODE;
 	public override statusText = HTTP_STATUS.ERROR_CLIENT.IM_A_TEAPOT.TEXT;
 }
@@ -124,26 +124,26 @@ class ImATeapot extends HttpError {
 
 /** HTTP 500 Internal Server Error. */
 class InternalServerError extends HttpError {
-	public override name = 'HttpInternalServerError';
+	public override name = "HttpInternalServerError";
 }
 
 /** HTTP 501 Not Implemented error. */
 class NotImplemented extends HttpError {
-	public override name = 'HttpNotImplementedError';
+	public override name = "HttpNotImplementedError";
 	public override status = HTTP_STATUS.ERROR_SERVER.NOT_IMPLEMENTED.CODE;
 	public override statusText = HTTP_STATUS.ERROR_SERVER.NOT_IMPLEMENTED.TEXT;
 }
 
 /** HTTP 502 Bad Gateway error. */
 class BadGateway extends HttpError {
-	public override name = 'HttpBadGatewayError';
+	public override name = "HttpBadGatewayError";
 	public override status = HTTP_STATUS.ERROR_SERVER.BAD_GATEWAY.CODE;
 	public override statusText = HTTP_STATUS.ERROR_SERVER.BAD_GATEWAY.TEXT;
 }
 
 /** HTTP 503 Service Unavailable error. */
 class ServiceUnavailable extends HttpError {
-	public override name = 'HttpServiceUnavailableError';
+	public override name = "HttpServiceUnavailableError";
 	public override status = HTTP_STATUS.ERROR_SERVER.SERVICE_UNAVAILABLE.CODE;
 	public override statusText = HTTP_STATUS.ERROR_SERVER.SERVICE_UNAVAILABLE.TEXT;
 }
@@ -172,34 +172,34 @@ class ServiceUnavailable extends HttpError {
  * ```
  */
 class NetworkError extends HttpError {
-	public override name = 'HttpNetworkError';
+	public override name = "HttpNetworkError";
 	public override status = 0;
-	public override statusText = 'Network Error';
+	public override statusText = "Network Error";
 }
 
 // Export individual error classes for direct imports
 export {
-	HttpError,
+	BadGateway,
 	// Client errors
 	BadRequest,
-	Unauthorized,
-	Forbidden,
-	NotFound,
-	MethodNotAllowed,
-	RequestTimeout,
 	Conflict,
+	Forbidden,
 	Gone,
-	LengthRequired,
+	HttpError,
 	ImATeapot,
-	UnprocessableContent,
-	TooManyRequests,
 	// Server errors
 	InternalServerError,
-	NotImplemented,
-	BadGateway,
-	ServiceUnavailable,
+	LengthRequired,
+	MethodNotAllowed,
 	// Transport error
 	NetworkError,
+	NotFound,
+	NotImplemented,
+	RequestTimeout,
+	ServiceUnavailable,
+	TooManyRequests,
+	Unauthorized,
+	UnprocessableContent,
 };
 
 /**
@@ -247,27 +247,27 @@ export const HTTP_ERROR = {
 };
 
 const _wellKnownCtorMap = {
-	'400': BadRequest,
-	'401': Unauthorized,
-	'403': Forbidden,
-	'404': NotFound,
-	'405': MethodNotAllowed,
-	'408': RequestTimeout,
-	'409': Conflict,
-	'410': Gone,
-	'411': LengthRequired,
-	'418': ImATeapot,
-	'422': UnprocessableContent,
-	'429': TooManyRequests,
+	"400": BadRequest,
+	"401": Unauthorized,
+	"403": Forbidden,
+	"404": NotFound,
+	"405": MethodNotAllowed,
+	"408": RequestTimeout,
+	"409": Conflict,
+	"410": Gone,
+	"411": LengthRequired,
+	"418": ImATeapot,
+	"422": UnprocessableContent,
+	"429": TooManyRequests,
 	//
-	'500': InternalServerError,
-	'501': NotImplemented,
-	'502': BadGateway,
-	'503': ServiceUnavailable,
+	"500": InternalServerError,
+	"501": NotImplemented,
+	"502": BadGateway,
+	"503": ServiceUnavailable,
 };
 
 const _maybeJsonParse = (v: unknown): unknown => {
-	if (typeof v === 'string') {
+	if (typeof v === "string") {
 		try {
 			return JSON.parse(v);
 		} catch (_e) {
@@ -301,7 +301,7 @@ export const createHttpError = (
 	code: number | string,
 	message?: string | null,
 	body?: unknown,
-	cause?: unknown
+	cause?: unknown,
 ): HttpError => {
 	const fallback = HTTP_STATUS.ERROR_SERVER.INTERNAL_SERVER_ERROR;
 
@@ -313,8 +313,8 @@ export const createHttpError = (
 	cause = _maybeJsonParse(cause);
 
 	// try to find the well known one, otherwise fallback to generic
-	const ctor =
-		_wellKnownCtorMap[`${code}` as keyof typeof _wellKnownCtorMap] ?? HttpError;
+	const ctor = _wellKnownCtorMap[`${code}` as keyof typeof _wellKnownCtorMap] ??
+		HttpError;
 
 	//
 	const found = HTTP_STATUS.findByCode(code);
@@ -355,7 +355,7 @@ export const createHttpError = (
  * @returns A human-readable error message string.
  */
 export const getErrorMessage = (e: unknown, stripErrorPrefix = true): string => {
-	if (!e) return '';
+	if (!e) return "";
 
 	// Errors may bubble from various sources which are not always under control.
 	// We try our best to extract a meaningful message using common conventions.
@@ -368,50 +368,60 @@ export const getErrorMessage = (e: unknown, stripErrorPrefix = true): string => 
 		// e.cause is the standard prop for error details, so should be considered as
 		// the most authoritative (if available)
 		// "code" and "message" are my own conventions
-		(typeof cause === 'object' ? cause?.message : null) ||
-		(typeof cause === 'object' ? cause?.code : null) ||
-		(typeof cause === 'string' ? cause : null) ||
-		// additional well-known cause shapes (RFC 7807, OAuth 2, nested OAuth)
-		(typeof cause === 'object' ? cause?.detail : null) ||
-		(typeof cause === 'object' ? cause?.error_description : null) ||
-		(typeof cause === 'object' ? (cause?.error as Record<string, unknown>)?.error_description : null) ||
-		(typeof cause === 'object' ? (cause?.error as Record<string, unknown>)?.detail : null) ||
-		// non-standard "body" is this package's HttpError prop
-		(typeof body === 'object' ? (body?.error as Record<string, unknown>)?.message : null) ||
-		(typeof body === 'object' ? body?.message : null) ||
-		// nested under body.error (OAuth-style nested + RFC 7807 nested)
-		(typeof body === 'object' ? (body?.error as Record<string, unknown>)?.error_description : null) ||
-		(typeof body === 'object' ? (body?.error as Record<string, unknown>)?.detail : null) ||
-		// RFC 7807 (Problem Details) / DRF / FastAPI
-		(typeof body === 'object' ? body?.detail : null) ||
-		(typeof body === 'object' ? body?.title : null) ||
-		// OAuth 2 (RFC 6749) — must precede `body.error` so error_description wins over the error code
-		(typeof body === 'object' ? body?.error_description : null) ||
-		// JSON:API / generic errors[] — first entry's detail/title/message, else string
-		(typeof body === 'object' && Array.isArray(body?.errors)
-			? (typeof body.errors[0] === 'string'
-				? body.errors[0]
-				: ((body.errors[0] as Record<string, unknown>)?.detail
-					|| (body.errors[0] as Record<string, unknown>)?.title
-					|| (body.errors[0] as Record<string, unknown>)?.message))
-			: null) ||
-		// fallback: body.error as plain string (e.g. OAuth error code without description)
-		(typeof body === 'object' ? body?.error : null) ||
-		(typeof body === 'string' ? body : null) ||
-		// the common message from Error ctor (e.g. "Foo" if new TypeError("Foo"))
-		err?.message ||
-		// Node.js error code fallback (e.g. "ECONNREFUSED") when message is empty
-		err?.code ||
-		// the Error class name (e.g. TypeError)
-		err?.name ||
-		// this should handle (almost) everything else (mainly if e is not an Error instance)
-		(typeof err?.toString === 'function' ? err.toString() : null) ||
-		// very last fallback if `toString()` was not available (or returned empty)
-		'Unknown Error'
+		(typeof cause === "object" ? cause?.message : null) ||
+			(typeof cause === "object" ? cause?.code : null) ||
+			(typeof cause === "string" ? cause : null) ||
+			// additional well-known cause shapes (RFC 7807, OAuth 2, nested OAuth)
+			(typeof cause === "object" ? cause?.detail : null) ||
+			(typeof cause === "object" ? cause?.error_description : null) ||
+			(typeof cause === "object"
+				? (cause?.error as Record<string, unknown>)?.error_description
+				: null) ||
+			(typeof cause === "object"
+				? (cause?.error as Record<string, unknown>)?.detail
+				: null) ||
+			// non-standard "body" is this package's HttpError prop
+			(typeof body === "object"
+				? (body?.error as Record<string, unknown>)?.message
+				: null) ||
+			(typeof body === "object" ? body?.message : null) ||
+			// nested under body.error (OAuth-style nested + RFC 7807 nested)
+			(typeof body === "object"
+				? (body?.error as Record<string, unknown>)?.error_description
+				: null) ||
+			(typeof body === "object"
+				? (body?.error as Record<string, unknown>)?.detail
+				: null) ||
+			// RFC 7807 (Problem Details) / DRF / FastAPI
+			(typeof body === "object" ? body?.detail : null) ||
+			(typeof body === "object" ? body?.title : null) ||
+			// OAuth 2 (RFC 6749) — must precede `body.error` so error_description wins over the error code
+			(typeof body === "object" ? body?.error_description : null) ||
+			// JSON:API / generic errors[] — first entry's detail/title/message, else string
+			(typeof body === "object" && Array.isArray(body?.errors)
+				? (typeof body.errors[0] === "string"
+					? body.errors[0]
+					: ((body.errors[0] as Record<string, unknown>)?.detail ||
+						(body.errors[0] as Record<string, unknown>)?.title ||
+						(body.errors[0] as Record<string, unknown>)?.message))
+				: null) ||
+			// fallback: body.error as plain string (e.g. OAuth error code without description)
+			(typeof body === "object" ? body?.error : null) ||
+			(typeof body === "string" ? body : null) ||
+			// the common message from Error ctor (e.g. "Foo" if new TypeError("Foo"))
+			err?.message ||
+			// Node.js error code fallback (e.g. "ECONNREFUSED") when message is empty
+			err?.code ||
+			// the Error class name (e.g. TypeError)
+			err?.name ||
+			// this should handle (almost) everything else (mainly if e is not an Error instance)
+			(typeof err?.toString === "function" ? err.toString() : null) ||
+			// very last fallback if `toString()` was not available (or returned empty)
+			"Unknown Error",
 	);
 
 	if (stripErrorPrefix) {
-		msg = msg.replace(/^[^:]*Error: /i, '');
+		msg = msg.replace(/^[^:]*Error: /i, "");
 	}
 
 	return msg;

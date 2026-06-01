@@ -107,7 +107,7 @@ Deno.test("B2: user Content-Type is not overwritten for object data", async () =
 	const r = (await api.post(
 		"/echo",
 		{ a: 1 },
-		{ headers: { "content-type": "application/ld+json" } }
+		{ headers: { "content-type": "application/ld+json" } },
 	)) as EchoResponse;
 	assertEquals(r.contentType, "application/ld+json");
 	assertEquals(r.body, '{"a":1}');
@@ -119,7 +119,7 @@ Deno.test("B3: string data is sent raw, not JSON-stringified", async () => {
 	const r = (await api.post(
 		"/echo",
 		"hello",
-		{ headers: { "content-type": "text/plain" } }
+		{ headers: { "content-type": "text/plain" } },
 	)) as EchoResponse;
 	assertEquals(r.body, "hello");
 	assertEquals(r.contentType, "text/plain");
@@ -138,7 +138,7 @@ Deno.test("B4: URLSearchParams body is sent as form-urlencoded", async () => {
 	const api = createHttpApi(url);
 	const r = (await api.post(
 		"/echo",
-		new URLSearchParams({ a: "1", b: "hello world" })
+		new URLSearchParams({ a: "1", b: "hello world" }),
 	)) as EchoResponse;
 	assertEquals(r.body, "a=1&b=hello+world");
 	assert((r.contentType ?? "").startsWith("application/x-www-form-urlencoded"));
@@ -224,7 +224,7 @@ Deno.test("D1: timeout aborts slow request with TimeoutError", async () => {
 	await assertRejects(
 		() => api.get("/slow?ms=2000", { timeout: 50 }),
 		// Should abort; the exact error type is DOMException/TimeoutError depending on runtime.
-		Error
+		Error,
 	);
 });
 

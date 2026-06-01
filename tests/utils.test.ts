@@ -85,7 +85,7 @@ Deno.test("getErrorMessage", () => {
 		123,
 		"Hey",
 		{ message: "Ha" },
-		{ message: "YO", code: "Ignored" }
+		{ message: "YO", code: "Ignored" },
 	);
 	assert(getErrorMessage(e) === "YO");
 

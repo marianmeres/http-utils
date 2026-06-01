@@ -24,23 +24,24 @@ Creates an HTTP API client with convenient defaults and error handling.
 
 ```ts
 function createHttpApi(
-  base?: string | null,
-  defaults?: Partial<FetchParams> | (() => Promise<Partial<FetchParams>>),
-  factoryErrorMessageExtractor?: ErrorMessageExtractor | null
-): HttpApi
+	base?: string | null,
+	defaults?: Partial<FetchParams> | (() => Promise<Partial<FetchParams>>),
+	factoryErrorMessageExtractor?: ErrorMessageExtractor | null,
+): HttpApi;
 ```
 
 ### Parameters
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `base` | `string \| null` | Optional base URL to prepend to all requests. |
-| `defaults` | `object \| function` | Optional default parameters or async function returning defaults. |
+| Parameter                      | Type                            | Description                                                        |
+| ------------------------------ | ------------------------------- | ------------------------------------------------------------------ |
+| `base`                         | `string \| null`                | Optional base URL to prepend to all requests.                      |
+| `defaults`                     | `object \| function`            | Optional default parameters or async function returning defaults.  |
 | `factoryErrorMessageExtractor` | `ErrorMessageExtractor \| null` | Optional function to extract error messages from failed responses. |
 
 ### Returns
 
-An `HttpApi` instance with methods: `get`, `post`, `put`, `patch`, `del`, `url`, and `base` property.
+An `HttpApi` instance with methods: `get`, `post`, `put`, `patch`, `del`, `url`, and
+`base` property.
 
 ### Example
 
@@ -52,18 +53,18 @@ const api = createHttpApi("https://api.example.com");
 
 // With default headers
 const api = createHttpApi("https://api.example.com", {
-  headers: { "Authorization": "Bearer token" }
+	headers: { "Authorization": "Bearer token" },
 });
 
 // With dynamic defaults (e.g., for token refresh)
 const api = createHttpApi("https://api.example.com", async () => {
-  const token = await getToken();
-  return { headers: { "Authorization": `Bearer ${token}` } };
+	const token = await getToken();
+	return { headers: { "Authorization": `Bearer ${token}` } };
 });
 
 // With custom error extractor
 const api = createHttpApi("https://api.example.com", null, (body) => {
-  return body?.error?.message || "Unknown error";
+	return body?.error?.message || "Unknown error";
 });
 ```
 
@@ -75,7 +76,7 @@ Global default error message extractor. Applied to all requests unless overridde
 
 ```ts
 createHttpApi.defaultErrorMessageExtractor = (body, response) => {
-  return body?.error?.message || response.statusText;
+	return body?.error?.message || response.statusText;
 };
 ```
 
@@ -85,19 +86,22 @@ Priority order: per-request > per-instance > global > built-in fallback.
 
 ## opts
 
-Marks an options object for the options-based API. Without this wrapper, arguments are treated as legacy positional parameters.
+Marks an options object for the options-based API. Without this wrapper, arguments are
+treated as legacy positional parameters.
 
 ```ts
-function opts<T extends GetOptions | DataOptions>(options: T): T
+function opts<T extends GetOptions | DataOptions>(options: T): T;
 ```
 
 ### Why `opts()`?
 
 The library supports two API styles:
+
 - **Legacy API**: Positional parameters (backward compatible)
 - **Options API**: Single options object with named properties
 
-The `opts()` wrapper explicitly indicates which style you're using, preventing ambiguity when your request data might look like an options object.
+The `opts()` wrapper explicitly indicates which style you're using, preventing ambiguity
+when your request data might look like an options object.
 
 ### Example
 
@@ -116,10 +120,13 @@ await api.post("/users", opts({ data: { name: "John" } }));
 
 // GET with options
 const respHeaders = {};
-await api.get("/users", opts({
-  params: { headers: { "X-Custom": "value" } },
-  respHeaders
-}));
+await api.get(
+	"/users",
+	opts({
+		params: { headers: { "X-Custom": "value" } },
+		respHeaders,
+	}),
+);
 ```
 
 ---
@@ -135,11 +142,13 @@ HTTP API client class. Usually created via `createHttpApi()`.
 Performs a GET request.
 
 **Options API (with `opts()` wrapper):**
+
 ```ts
 async get<T = unknown>(path: string, options?: GetOptions): Promise<T>
 ```
 
 **Legacy API (default behavior):**
+
 ```ts
 async get<T = unknown>(
   path: string,
@@ -150,13 +159,20 @@ async get<T = unknown>(
 ```
 
 **Example:**
+
 ```ts
 // Options API with type parameter (requires opts() wrapper)
-interface User { id: number; name: string; }
-const user = await api.get<User>("/users/1", opts({
-  params: { headers: { "X-Custom": "value" } },
-  respHeaders: {}
-}));
+interface User {
+	id: number;
+	name: string;
+}
+const user = await api.get<User>(
+	"/users/1",
+	opts({
+		params: { headers: { "X-Custom": "value" } },
+		respHeaders: {},
+	}),
+);
 
 // Without type parameter (returns unknown)
 const data = await api.get("/users");
@@ -170,11 +186,13 @@ const data = await api.get("/users", { headers: { "X-Custom": "value" } });
 Performs a POST request.
 
 **Options API (with `opts()` wrapper):**
+
 ```ts
 async post<T = unknown>(path: string, options?: DataOptions): Promise<T>
 ```
 
 **Legacy API (default behavior):**
+
 ```ts
 async post<T = unknown>(
   path: string,
@@ -186,13 +204,20 @@ async post<T = unknown>(
 ```
 
 **Example:**
+
 ```ts
 // Options API with type parameter (requires opts() wrapper)
-interface User { id: number; name: string; }
-const user = await api.post<User>("/users", opts({
-  data: { name: "John" },
-  params: { headers: { "X-Custom": "value" } }
-}));
+interface User {
+	id: number;
+	name: string;
+}
+const user = await api.post<User>(
+	"/users",
+	opts({
+		data: { name: "John" },
+		params: { headers: { "X-Custom": "value" } },
+	}),
+);
 
 // Legacy API (no opts() needed)
 const result = await api.post("/users", { name: "John" });
@@ -212,21 +237,23 @@ Performs a DELETE request. Same signature as `post<T>()`.
 
 #### `url(path)`
 
-Builds the full URL from a path. Base trailing slashes and missing path leading slashes are normalized so there is exactly one `/` between base and path.
+Builds the full URL from a path. Base trailing slashes and missing path leading slashes
+are normalized so there is exactly one `/` between base and path.
 
 ```ts
 url(path: string): string
 ```
 
 **Example:**
+
 ```ts
 const api = createHttpApi("https://api.example.com");
-api.url("/users");                  // "https://api.example.com/users"
-api.url("users");                   // "https://api.example.com/users" (leading slash added)
-api.url("https://other.com/path");  // "https://other.com/path" (absolute URLs returned as-is)
+api.url("/users"); // "https://api.example.com/users"
+api.url("users"); // "https://api.example.com/users" (leading slash added)
+api.url("https://other.com/path"); // "https://other.com/path" (absolute URLs returned as-is)
 
 const api2 = createHttpApi("https://api.example.com/v1/");
-api2.url("/users");                 // "https://api.example.com/v1/users" (no double slash)
+api2.url("/users"); // "https://api.example.com/v1/users" (no double slash)
 ```
 
 #### `onRequest(interceptor)`
@@ -254,19 +281,21 @@ set base(v: string | null | undefined)
 
 The `data` parameter is serialized based on its runtime type:
 
-| Runtime type | Behavior | Content-Type |
-|---|---|---|
-| `null` / `undefined` | No body sent | — |
-| `string` | Sent as-is | Caller's (fetch may default to `text/plain;charset=UTF-8`) |
-| `number` / `boolean` | `JSON.stringify`'d (e.g. `0` → `"0"`) | `application/json` if not set |
-| Plain object / array | `JSON.stringify`'d | `application/json` if not set |
-| `FormData` | Passed to fetch unchanged | `multipart/form-data; boundary=…` (fetch auto-sets) |
-| `URLSearchParams` | Passed to fetch unchanged | `application/x-www-form-urlencoded;charset=UTF-8` (fetch auto-sets) |
-| `Blob` | Passed to fetch unchanged | From the Blob's `.type` |
-| `ArrayBuffer` / typed arrays | Passed to fetch unchanged | Caller's (none by default) |
-| `ReadableStream` | Passed to fetch unchanged | Caller's |
+| Runtime type                 | Behavior                              | Content-Type                                                        |
+| ---------------------------- | ------------------------------------- | ------------------------------------------------------------------- |
+| `null` / `undefined`         | No body sent                          | —                                                                   |
+| `string`                     | Sent as-is                            | Caller's (fetch may default to `text/plain;charset=UTF-8`)          |
+| `number` / `boolean`         | `JSON.stringify`'d (e.g. `0` → `"0"`) | `application/json` if not set                                       |
+| Plain object / array         | `JSON.stringify`'d                    | `application/json` if not set                                       |
+| `FormData`                   | Passed to fetch unchanged             | `multipart/form-data; boundary=…` (fetch auto-sets)                 |
+| `URLSearchParams`            | Passed to fetch unchanged             | `application/x-www-form-urlencoded;charset=UTF-8` (fetch auto-sets) |
+| `Blob`                       | Passed to fetch unchanged             | From the Blob's `.type`                                             |
+| `ArrayBuffer` / typed arrays | Passed to fetch unchanged             | Caller's (none by default)                                          |
+| `ReadableStream`             | Passed to fetch unchanged             | Caller's                                                            |
 
-If you explicitly set `Content-Type` in `headers`, it is always respected — even for object data. Objects are still JSON-stringified; set your own body (e.g. via a string) if you need a non-JSON serialization.
+If you explicitly set `Content-Type` in `headers`, it is always respected — even for
+object data. Objects are still JSON-stringified; set your own body (e.g. via a string) if
+you need a non-JSON serialization.
 
 ```ts
 // Plain object → JSON
@@ -274,7 +303,7 @@ await api.post("/users", { name: "John" });
 
 // Respect user Content-Type
 await api.post("/graph", { query: "{ me { id } }" }, {
-  headers: { "content-type": "application/graphql+json" },
+	headers: { "content-type": "application/graphql+json" },
 });
 
 // FormData (file upload)
@@ -287,7 +316,7 @@ await api.post("/login", new URLSearchParams({ user: "a", pass: "b" }));
 
 // Raw string body
 await api.post("/logs", "raw log line", {
-  headers: { "content-type": "text/plain" },
+	headers: { "content-type": "text/plain" },
 });
 ```
 
@@ -299,13 +328,13 @@ Use `params.query` to append query-string parameters to the URL.
 
 ```ts
 await api.get("/search", {
-  query: {
-    q: "hello world",
-    page: 1,
-    active: true,
-    tag: ["a", "b"],      // → ?tag=a&tag=b
-    ignored: null,         // null and undefined are skipped
-  },
+	query: {
+		q: "hello world",
+		page: 1,
+		active: true,
+		tag: ["a", "b"], // → ?tag=a&tag=b
+		ignored: null, // null and undefined are skipped
+	},
 });
 // GET /search?q=hello+world&page=1&active=true&tag=a&tag=b
 ```
@@ -316,7 +345,8 @@ If the path already contains `?`, query params are appended with `&`.
 
 ## Timeouts and Cancellation
 
-`params.timeout` (in milliseconds) aborts the request via `AbortSignal.timeout`. It composes with a user-provided `signal` — whichever fires first aborts the request.
+`params.timeout` (in milliseconds) aborts the request via `AbortSignal.timeout`. It
+composes with a user-provided `signal` — whichever fires first aborts the request.
 
 ```ts
 // Simple timeout
@@ -325,13 +355,14 @@ await api.get("/slow", { timeout: 5000 });
 // Timeout + cancellable signal
 const ctrl = new AbortController();
 await api.get("/slow", {
-  timeout: 10_000,
-  signal: ctrl.signal,
+	timeout: 10_000,
+	signal: ctrl.signal,
 });
 // ctrl.abort() or timeout — whichever first — cancels the request.
 ```
 
-Uses `AbortSignal.any` when available (Node 20+, modern Deno). Falls back to manual composition otherwise.
+Uses `AbortSignal.any` when available (Node 20+, modern Deno). Falls back to manual
+composition otherwise.
 
 ---
 
@@ -341,28 +372,31 @@ Register per-instance hooks that run around each request.
 
 ### `onRequest(interceptor)`
 
-Called after defaults are merged, with the final `RequestInit` and resolved URL. Return a new `RequestInit` to replace the original, or `void` / `undefined` to keep it.
+Called after defaults are merged, with the final `RequestInit` and resolved URL. Return a
+new `RequestInit` to replace the original, or `void` / `undefined` to keep it.
 
 ```ts
 const api = createHttpApi("https://api.example.com").onRequest((init, ctx) => {
-  console.log(`[http] → ${ctx.method} ${ctx.url}`);
-  const h = new Headers(init.headers);
-  h.set("x-trace-id", crypto.randomUUID());
-  return { ...init, headers: h };
+	console.log(`[http] → ${ctx.method} ${ctx.url}`);
+	const h = new Headers(init.headers);
+	h.set("x-trace-id", crypto.randomUUID());
+	return { ...init, headers: h };
 });
 ```
 
 ### `onResponse(interceptor)`
 
-Called before the body is consumed. **Must not read the body.** Return a replacement `Response` (e.g. after a retry) or `void` to keep the original. If you return a replacement, the original's body is cancelled for you.
+Called before the body is consumed. **Must not read the body.** Return a replacement
+`Response` (e.g. after a retry) or `void` to keep the original. If you return a
+replacement, the original's body is cancelled for you.
 
 ```ts
 api.onResponse(async (resp, ctx) => {
-  console.log(`[http] ← ${ctx.method} ${ctx.url} ${resp.status}`);
-  if (resp.status === 401) {
-    await refreshToken();
-    // return a new fetch() if you want to retry
-  }
+	console.log(`[http] ← ${ctx.method} ${ctx.url} ${resp.status}`);
+	if (resp.status === 401) {
+		await refreshToken();
+		// return a new fetch() if you want to retry
+	}
 });
 ```
 
@@ -378,32 +412,33 @@ Request body data type. See [Request Bodies](#request-bodies) for serialization 
 
 ```ts
 type RequestData =
-  | Record<string, unknown>
-  | unknown[]
-  | FormData
-  | Blob
-  | ArrayBuffer
-  | ArrayBufferView
-  | URLSearchParams
-  | ReadableStream
-  | string
-  | number
-  | boolean
-  | null;
+	| Record<string, unknown>
+	| unknown[]
+	| FormData
+	| Blob
+	| ArrayBuffer
+	| ArrayBufferView
+	| URLSearchParams
+	| ReadableStream
+	| string
+	| number
+	| boolean
+	| null;
 ```
 
 ### QueryValue
 
-A value for `FetchParams.query`. `null` / `undefined` entries are skipped; arrays emit repeated keys.
+A value for `FetchParams.query`. `null` / `undefined` entries are skipped; arrays emit
+repeated keys.
 
 ```ts
 type QueryValue =
-  | string
-  | number
-  | boolean
-  | (string | number | boolean)[]
-  | null
-  | undefined;
+	| string
+	| number
+	| boolean
+	| (string | number | boolean)[]
+	| null
+	| undefined;
 ```
 
 ### FetchParams
@@ -412,24 +447,24 @@ Parameters for fetch requests.
 
 ```ts
 interface FetchParams {
-  /** Request body. See "Request Bodies" for serialization rules. */
-  data?: RequestData;
-  /** Bearer token (auto-adds `Authorization: Bearer {token}` header). */
-  token?: string | null;
-  /** Custom request headers. */
-  headers?: HeadersInit | null;
-  /** AbortSignal for request cancellation. Combined with `timeout` if both are set. */
-  signal?: AbortSignal;
-  /** Abort the request after this many milliseconds. Combined with `signal`. */
-  timeout?: number | null;
-  /** Query parameters appended to the URL. */
-  query?: Record<string, QueryValue> | null;
-  /** Credentials mode for the request. */
-  credentials?: 'omit' | 'same-origin' | 'include' | null;
-  /** If true, returns the raw Response object instead of parsed body. Caller must consume the body. */
-  raw?: boolean | null;
-  /** If false, does not throw on HTTP errors (default: true). */
-  assert?: boolean | null;
+	/** Request body. See "Request Bodies" for serialization rules. */
+	data?: RequestData;
+	/** Bearer token (auto-adds `Authorization: Bearer {token}` header). */
+	token?: string | null;
+	/** Custom request headers. */
+	headers?: HeadersInit | null;
+	/** AbortSignal for request cancellation. Combined with `timeout` if both are set. */
+	signal?: AbortSignal;
+	/** Abort the request after this many milliseconds. Combined with `signal`. */
+	timeout?: number | null;
+	/** Query parameters appended to the URL. */
+	query?: Record<string, QueryValue> | null;
+	/** Credentials mode for the request. */
+	credentials?: "omit" | "same-origin" | "include" | null;
+	/** If true, returns the raw Response object instead of parsed body. Caller must consume the body. */
+	raw?: boolean | null;
+	/** If false, does not throw on HTTP errors (default: true). */
+	assert?: boolean | null;
 }
 ```
 
@@ -439,12 +474,12 @@ Options for HTTP GET requests (new API).
 
 ```ts
 interface GetOptions {
-  /** Fetch parameters (headers, token, signal, credentials, raw, assert). */
-  params?: FetchParams;
-  /** Object to receive response headers (will be mutated). */
-  respHeaders?: ResponseHeaders | null;
-  /** Custom error message extractor for this request. */
-  errorExtractor?: ErrorMessageExtractor | null;
+	/** Fetch parameters (headers, token, signal, credentials, raw, assert). */
+	params?: FetchParams;
+	/** Object to receive response headers (will be mutated). */
+	respHeaders?: ResponseHeaders | null;
+	/** Custom error message extractor for this request. */
+	errorExtractor?: ErrorMessageExtractor | null;
 }
 ```
 
@@ -454,14 +489,14 @@ Options for HTTP POST/PUT/PATCH/DELETE requests (new API).
 
 ```ts
 interface DataOptions {
-  /** Request body data. */
-  data?: RequestData;
-  /** Fetch parameters (headers, token, signal, credentials, raw, assert). */
-  params?: FetchParams;
-  /** Object to receive response headers (will be mutated). */
-  respHeaders?: ResponseHeaders | null;
-  /** Custom error message extractor for this request. */
-  errorExtractor?: ErrorMessageExtractor | null;
+	/** Request body data. */
+	data?: RequestData;
+	/** Fetch parameters (headers, token, signal, credentials, raw, assert). */
+	params?: FetchParams;
+	/** Object to receive response headers (will be mutated). */
+	respHeaders?: ResponseHeaders | null;
+	/** Custom error message extractor for this request. */
+	errorExtractor?: ErrorMessageExtractor | null;
 }
 ```
 
@@ -474,12 +509,15 @@ type ResponseHeaders = Record<string, string | number>;
 ```
 
 Special keys added after request:
+
 - `__http_status_code__`: The HTTP status code
 - `__http_status_text__`: The HTTP status text
 
 ### ErrorMessageExtractor
 
-Function to extract error messages from failed HTTP responses. If the extractor throws, the call falls back to the next-priority extractor (per-instance → global → built-in) instead of crashing.
+Function to extract error messages from failed HTTP responses. If the extractor throws,
+the call falls back to the next-priority extractor (per-instance → global → built-in)
+instead of crashing.
 
 ```ts
 type ErrorMessageExtractor = (body: unknown, response: Response) => string;
@@ -489,8 +527,8 @@ type ErrorMessageExtractor = (body: unknown, response: Response) => string;
 
 ```ts
 type RequestInterceptor = (
-  init: RequestInit,
-  context: { method: string; url: string }
+	init: RequestInit,
+	context: { method: string; url: string },
 ) => RequestInit | void | Promise<RequestInit | void>;
 ```
 
@@ -498,8 +536,8 @@ type RequestInterceptor = (
 
 ```ts
 type ResponseInterceptor = (
-  response: Response,
-  context: { method: string; url: string }
+	response: Response,
+	context: { method: string; url: string },
 ) => Response | void | Promise<Response | void>;
 ```
 
@@ -513,46 +551,47 @@ All errors extend `HttpError` base class.
 
 ```ts
 class HttpError extends Error {
-  status: number;      // HTTP status code
-  statusText: string;  // HTTP status text
-  body: unknown;       // Response body (auto-parsed as JSON)
-  cause: unknown;      // Error cause/details
+	status: number; // HTTP status code
+	statusText: string; // HTTP status text
+	body: unknown; // Response body (auto-parsed as JSON)
+	cause: unknown; // Error cause/details
 }
 ```
 
 ### Client Errors (4xx)
 
-| Class | Status | Description |
-|-------|--------|-------------|
-| `BadRequest` | 400 | Bad Request |
-| `Unauthorized` | 401 | Unauthorized |
-| `Forbidden` | 403 | Forbidden |
-| `NotFound` | 404 | Not Found |
-| `MethodNotAllowed` | 405 | Method Not Allowed |
-| `RequestTimeout` | 408 | Request Timeout |
-| `Conflict` | 409 | Conflict |
-| `Gone` | 410 | Gone |
-| `LengthRequired` | 411 | Length Required |
-| `ImATeapot` | 418 | I'm a Teapot |
-| `UnprocessableContent` | 422 | Unprocessable Content |
-| `TooManyRequests` | 429 | Too Many Requests |
+| Class                  | Status | Description           |
+| ---------------------- | ------ | --------------------- |
+| `BadRequest`           | 400    | Bad Request           |
+| `Unauthorized`         | 401    | Unauthorized          |
+| `Forbidden`            | 403    | Forbidden             |
+| `NotFound`             | 404    | Not Found             |
+| `MethodNotAllowed`     | 405    | Method Not Allowed    |
+| `RequestTimeout`       | 408    | Request Timeout       |
+| `Conflict`             | 409    | Conflict              |
+| `Gone`                 | 410    | Gone                  |
+| `LengthRequired`       | 411    | Length Required       |
+| `ImATeapot`            | 418    | I'm a Teapot          |
+| `UnprocessableContent` | 422    | Unprocessable Content |
+| `TooManyRequests`      | 429    | Too Many Requests     |
 
 ### Server Errors (5xx)
 
-| Class | Status | Description |
-|-------|--------|-------------|
-| `InternalServerError` | 500 | Internal Server Error |
-| `NotImplemented` | 501 | Not Implemented |
-| `BadGateway` | 502 | Bad Gateway |
-| `ServiceUnavailable` | 503 | Service Unavailable |
+| Class                 | Status | Description           |
+| --------------------- | ------ | --------------------- |
+| `InternalServerError` | 500    | Internal Server Error |
+| `NotImplemented`      | 501    | Not Implemented       |
+| `BadGateway`          | 502    | Bad Gateway           |
+| `ServiceUnavailable`  | 503    | Service Unavailable   |
 
 ### Transport Errors
 
-| Class | Status | Description |
-|-------|--------|-------------|
-| `NetworkError` | 0 | Transport-level failure — DNS failure, refused connection, connect timeout, unreachable host. No HTTP response was received (hence `status` is `0`). Thrown by [`fetchOrThrow`](#fetchorthrow) and the `HttpApi` client; the underlying transport error is attached as `cause`. |
+| Class          | Status | Description                                                                                                                                                                                                                                                                     |
+| -------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NetworkError` | 0      | Transport-level failure — DNS failure, refused connection, connect timeout, unreachable host. No HTTP response was received (hence `status` is `0`). Thrown by [`fetchOrThrow`](#fetchorthrow) and the `HttpApi` client; the underlying transport error is attached as `cause`. |
 
-`NetworkError` extends `HttpError`, so it is caught by `instanceof HTTP_ERROR.HttpError` as well.
+`NetworkError` extends `HttpError`, so it is caught by `instanceof HTTP_ERROR.HttpError`
+as well.
 
 ### HTTP_ERROR Namespace
 
@@ -562,14 +601,14 @@ All error classes are available via the `HTTP_ERROR` namespace:
 import { HTTP_ERROR } from "@marianmeres/http-utils";
 
 try {
-  await api.get("/resource");
+	await api.get("/resource");
 } catch (error) {
-  if (error instanceof HTTP_ERROR.NotFound) {
-    console.log("Resource not found");
-  }
-  if (error instanceof HTTP_ERROR.HttpError) {
-    console.log("HTTP error:", error.status);
-  }
+	if (error instanceof HTTP_ERROR.NotFound) {
+		console.log("Resource not found");
+	}
+	if (error instanceof HTTP_ERROR.HttpError) {
+		console.log("HTTP error:", error.status);
+	}
 }
 ```
 
@@ -584,44 +623,44 @@ Access status codes by category or via direct shortcuts.
 #### Categories
 
 ```ts
-HTTP_STATUS.INFO           // 1xx Informational
-HTTP_STATUS.SUCCESS        // 2xx Success
-HTTP_STATUS.REDIRECT       // 3xx Redirection
-HTTP_STATUS.ERROR_CLIENT   // 4xx Client Error
-HTTP_STATUS.ERROR_SERVER   // 5xx Server Error
+HTTP_STATUS.INFO; // 1xx Informational
+HTTP_STATUS.SUCCESS; // 2xx Success
+HTTP_STATUS.REDIRECT; // 3xx Redirection
+HTTP_STATUS.ERROR_CLIENT; // 4xx Client Error
+HTTP_STATUS.ERROR_SERVER; // 5xx Server Error
 ```
 
 #### Category Access
 
 ```ts
-HTTP_STATUS.SUCCESS.OK.CODE                  // 200
-HTTP_STATUS.SUCCESS.OK.TEXT                  // "OK"
-HTTP_STATUS.ERROR_CLIENT.NOT_FOUND.CODE      // 404
-HTTP_STATUS.ERROR_CLIENT.NOT_FOUND.TEXT      // "Not Found"
+HTTP_STATUS.SUCCESS.OK.CODE; // 200
+HTTP_STATUS.SUCCESS.OK.TEXT; // "OK"
+HTTP_STATUS.ERROR_CLIENT.NOT_FOUND.CODE; // 404
+HTTP_STATUS.ERROR_CLIENT.NOT_FOUND.TEXT; // "Not Found"
 ```
 
 #### Direct Shortcuts
 
 ```ts
-HTTP_STATUS.OK                    // 200
-HTTP_STATUS.CREATED               // 201
-HTTP_STATUS.ACCEPTED              // 202
-HTTP_STATUS.NO_CONTENT            // 204
-HTTP_STATUS.MOVED_PERMANENTLY     // 301
-HTTP_STATUS.FOUND                 // 302
-HTTP_STATUS.NOT_MODIFIED          // 304
-HTTP_STATUS.BAD_REQUEST           // 400
-HTTP_STATUS.UNAUTHORIZED          // 401
-HTTP_STATUS.FORBIDDEN             // 403
-HTTP_STATUS.NOT_FOUND             // 404
-HTTP_STATUS.METHOD_NOT_ALLOWED    // 405
-HTTP_STATUS.CONFLICT              // 409
-HTTP_STATUS.GONE                  // 410
-HTTP_STATUS.UNPROCESSABLE_CONTENT // 422
-HTTP_STATUS.TOO_MANY_REQUESTS     // 429
-HTTP_STATUS.INTERNAL_SERVER_ERROR // 500
-HTTP_STATUS.NOT_IMPLEMENTED       // 501
-HTTP_STATUS.SERVICE_UNAVAILABLE   // 503
+HTTP_STATUS.OK; // 200
+HTTP_STATUS.CREATED; // 201
+HTTP_STATUS.ACCEPTED; // 202
+HTTP_STATUS.NO_CONTENT; // 204
+HTTP_STATUS.MOVED_PERMANENTLY; // 301
+HTTP_STATUS.FOUND; // 302
+HTTP_STATUS.NOT_MODIFIED; // 304
+HTTP_STATUS.BAD_REQUEST; // 400
+HTTP_STATUS.UNAUTHORIZED; // 401
+HTTP_STATUS.FORBIDDEN; // 403
+HTTP_STATUS.NOT_FOUND; // 404
+HTTP_STATUS.METHOD_NOT_ALLOWED; // 405
+HTTP_STATUS.CONFLICT; // 409
+HTTP_STATUS.GONE; // 410
+HTTP_STATUS.UNPROCESSABLE_CONTENT; // 422
+HTTP_STATUS.TOO_MANY_REQUESTS; // 429
+HTTP_STATUS.INTERNAL_SERVER_ERROR; // 500
+HTTP_STATUS.NOT_IMPLEMENTED; // 501
+HTTP_STATUS.SERVICE_UNAVAILABLE; // 503
 ```
 
 #### findByCode(code)
@@ -638,6 +677,7 @@ static findByCode(code: number | string): {
 ```
 
 **Example:**
+
 ```ts
 const info = HTTP_STATUS.findByCode(404);
 // { CODE: 404, TEXT: "Not Found", _TYPE: "ERROR_CLIENT", _KEY: "NOT_FOUND" }
@@ -649,35 +689,45 @@ const info = HTTP_STATUS.findByCode(404);
 
 ### fetchOrThrow
 
-Wraps the native `fetch` so a transport-level failure surfaces the target host and the real reason instead of an opaque `TypeError: fetch failed`. Node/undici buries the actual code (`ENOTFOUND`, `ECONNREFUSED`, `UND_ERR_CONNECT_TIMEOUT`, …) on `err.cause`, away from the message and stack. On such a failure this throws a [`NetworkError`](#transport-errors) whose message includes the URL and reason, and whose `cause` is the underlying transport error. Deliberate cancellations (`AbortError`) and timeouts (`TimeoutError`) are re-thrown untouched.
+Wraps the native `fetch` so a transport-level failure surfaces the target host and the
+real reason instead of an opaque `TypeError: fetch failed`. Node/undici buries the actual
+code (`ENOTFOUND`, `ECONNREFUSED`, `UND_ERR_CONNECT_TIMEOUT`, …) on `err.cause`, away from
+the message and stack. On such a failure this throws a [`NetworkError`](#transport-errors)
+whose message includes the URL and reason, and whose `cause` is the underlying transport
+error. Deliberate cancellations (`AbortError`) and timeouts (`TimeoutError`) are re-thrown
+untouched.
 
-The `HttpApi` client uses this internally, so all of its requests surface the real reason too — you only need `fetchOrThrow` directly when wrapping your own `fetch` calls.
+The `HttpApi` client uses this internally, so all of its requests surface the real reason
+too — you only need `fetchOrThrow` directly when wrapping your own `fetch` calls.
 
 ```ts
 function fetchOrThrow(
-  input: string | URL | Request,
-  init?: RequestInit,
-  what?: string
-): Promise<Response>
+	input: string | URL | Request,
+	init?: RequestInit,
+	what?: string,
+): Promise<Response>;
 ```
 
-Like the native `fetch`, this does **not** throw on non-2xx HTTP statuses — only on transport-level failures. The optional `what` is a label describing the target (e.g. `"Token issuer"`) used to prefix the error message.
+Like the native `fetch`, this does **not** throw on non-2xx HTTP statuses — only on
+transport-level failures. The optional `what` is a label describing the target (e.g.
+`"Token issuer"`) used to prefix the error message.
 
 **Example:**
+
 ```ts
 import { fetchOrThrow, HTTP_ERROR } from "@marianmeres/http-utils";
 
 try {
-  const res = await fetchOrThrow(
-    "https://issuer.example.com/jwks",
-    undefined,
-    "Token issuer"
-  );
+	const res = await fetchOrThrow(
+		"https://issuer.example.com/jwks",
+		undefined,
+		"Token issuer",
+	);
 } catch (e) {
-  if (e instanceof HTTP_ERROR.NetworkError) {
-    console.log(e.message); // "Token issuer unreachable (https://issuer.example.com/jwks): ENOTFOUND"
-    console.log(e.cause);   // underlying transport error
-  }
+	if (e instanceof HTTP_ERROR.NetworkError) {
+		console.log(e.message); // "Token issuer unreachable (https://issuer.example.com/jwks): ENOTFOUND"
+		console.log(e.cause); // underlying transport error
+	}
 }
 ```
 
@@ -687,21 +737,22 @@ Creates an HTTP error from a status code and optional details.
 
 ```ts
 function createHttpError(
-  code: number | string,
-  message?: string | null,
-  body?: unknown,
-  cause?: unknown
-): HttpError
+	code: number | string,
+	message?: string | null,
+	body?: unknown,
+	cause?: unknown,
+): HttpError;
 ```
 
 Returns a specific error class for well-known status codes.
 
 **Example:**
+
 ```ts
 const error = createHttpError(404, "User not found", { userId: 123 });
 console.log(error instanceof NotFound); // true
-console.log(error.status);              // 404
-console.log(error.body);                // { userId: 123 }
+console.log(error.status); // 404
+console.log(error.body); // { userId: 123 }
 ```
 
 ### getErrorMessage
@@ -709,10 +760,11 @@ console.log(error.body);                // { userId: 123 }
 Extracts a human-readable error message from various error formats.
 
 ```ts
-function getErrorMessage(e: unknown, stripErrorPrefix?: boolean): string
+function getErrorMessage(e: unknown, stripErrorPrefix?: boolean): string;
 ```
 
 **Priority order:**
+
 1. `e.cause.message` / `e.cause.code` / `e.cause` (if string)
 2. `e.body.error.message` / `e.body.message` / `e.body.error` / `e.body` (if string)
 3. `e.message`
@@ -721,12 +773,13 @@ function getErrorMessage(e: unknown, stripErrorPrefix?: boolean): string
 6. `"Unknown Error"`
 
 **Example:**
+
 ```ts
 import { getErrorMessage } from "@marianmeres/http-utils";
 
 try {
-  await api.get("/fail");
+	await api.get("/fail");
 } catch (error) {
-  console.log(getErrorMessage(error)); // "Not Found"
+	console.log(getErrorMessage(error)); // "Not Found"
 }
 ```

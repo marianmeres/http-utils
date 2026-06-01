@@ -50,10 +50,13 @@ Deno.test("new API: GET with options object", async () => {
 	const respHeaders: Record<string, string | number> = {};
 
 	// New API style - requires opts() wrapper
-	const data = (await api.get("/echo", opts({
-		params: { headers: { "x-custom": "test-value" } },
-		respHeaders,
-	}))) as Record<string, unknown>;
+	const data = (await api.get(
+		"/echo",
+		opts({
+			params: { headers: { "x-custom": "test-value" } },
+			respHeaders,
+		}),
+	)) as Record<string, unknown>;
 
 	assertEquals(data.message, "GET response");
 	assertEquals(respHeaders.__http_status_code__, 200);
@@ -65,11 +68,14 @@ Deno.test("new API: POST with options object", async () => {
 	const respHeaders: Record<string, string | number> = {};
 
 	// New API style - requires opts() wrapper
-	const data = (await api.post("/echo", opts({
-		data: { name: "John", age: 30 },
-		params: { headers: { "x-custom": "post-test" } },
-		respHeaders,
-	}))) as Record<string, unknown>;
+	const data = (await api.post(
+		"/echo",
+		opts({
+			data: { name: "John", age: 30 },
+			params: { headers: { "x-custom": "post-test" } },
+			respHeaders,
+		}),
+	)) as Record<string, unknown>;
 
 	assertEquals(data.name, "John");
 	assertEquals(data.age, 30);
@@ -81,9 +87,12 @@ Deno.test("new API: GET with minimal options", async () => {
 	const api = createHttpApi(url);
 
 	// Just params, no respHeaders - requires opts() wrapper
-	const data = (await api.get("/echo", opts({
-		params: { raw: false },
-	}))) as Record<string, unknown>;
+	const data = (await api.get(
+		"/echo",
+		opts({
+			params: { raw: false },
+		}),
+	)) as Record<string, unknown>;
 
 	assertEquals(data.message, "GET response");
 });
@@ -92,9 +101,12 @@ Deno.test("new API: POST without data field (should work)", async () => {
 	const api = createHttpApi(url);
 
 	// Options object without data field (data will be null) - requires opts() wrapper
-	const data = await api.post("/echo", opts({
-		params: { headers: { "x-custom": "no-data" } },
-	}));
+	const data = await api.post(
+		"/echo",
+		opts({
+			params: { headers: { "x-custom": "no-data" } },
+		}),
+	);
 
 	// Server echoes empty body (JSON.stringify(null) = "null", but empty body might be "")
 	// Just verify it doesn't crash
@@ -109,7 +121,7 @@ Deno.test("backward compatibility: legacy GET API still works", async () => {
 	const data = (await api.get(
 		"/echo",
 		{ headers: { "x-custom": "legacy" } },
-		respHeaders
+		respHeaders,
 	)) as Record<string, unknown>;
 
 	assertEquals(data.message, "GET response");
@@ -126,7 +138,7 @@ Deno.test("backward compatibility: legacy POST API still works", async () => {
 		"/echo",
 		{ name: "Jane" },
 		{ headers: { "x-custom": "legacy-post" } },
-		respHeaders
+		respHeaders,
 	)) as Record<string, unknown>;
 
 	assertEquals(data.name, "Jane");

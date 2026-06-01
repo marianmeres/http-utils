@@ -35,11 +35,7 @@ export type RequestData =
 type QueryPrimitive = string | number | boolean;
 
 /** A value for {@link FetchParams.query}. `null`/`undefined` entries are skipped. */
-export type QueryValue =
-	| QueryPrimitive
-	| QueryPrimitive[]
-	| null
-	| undefined;
+export type QueryValue = QueryPrimitive | QueryPrimitive[] | null | undefined;
 
 /**
  * Deep merges two objects. Later properties overwrite earlier properties.
@@ -47,7 +43,7 @@ export type QueryValue =
  */
 function deepMerge<T = unknown>(
 	target: Record<string, unknown>,
-	source: Record<string, unknown>
+	source: Record<string, unknown>,
 ): T {
 	const output = { ...target };
 
@@ -95,10 +91,7 @@ function isNativeBodyInit(v: unknown): boolean {
  * Appends query parameters to a URL path. Null/undefined values are skipped.
  * Array values are emitted as repeated keys (e.g. `?tag=a&tag=b`).
  */
-function appendQuery(
-	path: string,
-	query: Record<string, QueryValue>
-): string {
+function appendQuery(path: string, query: Record<string, QueryValue>): string {
 	const sp = new URLSearchParams();
 	for (const [k, v] of Object.entries(query)) {
 		if (v === null || v === undefined) continue;
@@ -121,7 +114,7 @@ function appendQuery(
  */
 function composeSignal(
 	userSignal: AbortSignal | undefined,
-	timeoutMs: number | undefined
+	timeoutMs: number | undefined,
 ): AbortSignal | undefined {
 	if (!timeoutMs || timeoutMs <= 0) return userSignal;
 	const timeoutSignal = AbortSignal.timeout(timeoutMs);
@@ -136,8 +129,9 @@ function composeSignal(
 	if (userSignal.aborted) abort(userSignal.reason);
 	else userSignal.addEventListener("abort", () => abort(userSignal.reason));
 	if (timeoutSignal.aborted) abort(timeoutSignal.reason);
-	else
+	else {
 		timeoutSignal.addEventListener("abort", () => abort(timeoutSignal.reason));
+	}
 	return ctrl.signal;
 }
 
@@ -153,7 +147,7 @@ interface BaseParams {
  */
 export type RequestInterceptor = (
 	init: RequestInit,
-	context: { method: string; url: string }
+	context: { method: string; url: string },
 ) => RequestInit | void | Promise<RequestInit | void>;
 
 /**
@@ -163,7 +157,7 @@ export type RequestInterceptor = (
  */
 export type ResponseInterceptor = (
 	response: Response,
-	context: { method: string; url: string }
+	context: { method: string; url: string },
 ) => Response | void | Promise<Response | void>;
 
 /**
@@ -200,7 +194,7 @@ type BaseFetchParams = BaseParams & FetchParams;
  */
 export type ErrorMessageExtractor = (
 	body: unknown,
-	response: Response
+	response: Response,
 ) => string;
 
 /**
@@ -277,7 +271,7 @@ interface ParsedDataOptions {
 function parseGetOptions(
 	paramsOrOptions: FetchParams | GetOptions | undefined,
 	legacyRespHeaders?: ResponseHeaders | null,
-	legacyErrorExtractor?: ErrorMessageExtractor | null
+	legacyErrorExtractor?: ErrorMessageExtractor | null,
 ): ParsedGetOptions {
 	if (paramsOrOptions && OPTIONS_MARKER in paramsOrOptions) {
 		const o = paramsOrOptions as GetOptions;
@@ -301,7 +295,7 @@ function parseDataOptions(
 	dataOrOptions: RequestData | DataOptions | undefined,
 	legacyParams?: FetchParams,
 	legacyRespHeaders?: ResponseHeaders | null,
-	legacyErrorExtractor?: ErrorMessageExtractor | null
+	legacyErrorExtractor?: ErrorMessageExtractor | null,
 ): ParsedDataOptions {
 	if (
 		dataOrOptions &&
@@ -328,9 +322,10 @@ function parseDataOptions(
  * Builds the final RequestInit and serialized URL from FetchParams.
  * Does not call fetch.
  */
-function buildRequest(
-	params: BaseFetchParams
-): { url: string; init: RequestInit } {
+function buildRequest(params: BaseFetchParams): {
+	url: string;
+	init: RequestInit;
+} {
 	const {
 		method,
 		path,
@@ -437,7 +432,7 @@ function _describeFetchTarget(input: Parameters<typeof fetch>[0]): string {
 export async function fetchOrThrow(
 	input: Parameters<typeof fetch>[0],
 	init?: Parameters<typeof fetch>[1],
-	what?: string
+	what?: string,
 ): Promise<Response> {
 	try {
 		return await fetch(input, init);
@@ -464,7 +459,7 @@ const _fetch = async (
 	errorMessageExtractor: ErrorMessageExtractor | null | undefined = null,
 	requestInterceptor: RequestInterceptor | null | undefined = null,
 	responseInterceptor: ResponseInterceptor | null | undefined = null,
-	_dumpParams = false
+	_dumpParams = false,
 ) => {
 	if (_dumpParams) return params;
 
@@ -489,7 +484,9 @@ const _fetch = async (
 			// Cancel the original body so the underlying stream doesn't leak.
 			try {
 				await r.body?.cancel();
-			} catch (_e) { /* ignore */ }
+			} catch (_e) {
+				/* ignore */
+			}
 			r = patched;
 		}
 	}
@@ -499,7 +496,7 @@ const _fetch = async (
 	// Convert Headers to plain object
 	const headers: ResponseHeaders = [...r.headers.entries()].reduce(
 		(m, [k, v]) => ({ ...m, [k]: v }),
-		{} as ResponseHeaders
+		{} as ResponseHeaders,
 	);
 
 	// Mutate respHeaders to provide access to response headers and status
@@ -508,7 +505,7 @@ const _fetch = async (
 			respHeaders,
 			headers,
 			// Add status/text under special keys
-			{ __http_status_code__: r.status, __http_status_text__: r.statusText }
+			{ __http_status_code__: r.status, __http_status_text__: r.statusText },
 		);
 	}
 
@@ -519,7 +516,9 @@ const _fetch = async (
 		body = null;
 	} else {
 		// prettier-ignore
-		try { body = JSON.parse(text); } catch (_e) { /* ignore parse errors */ }
+		try {
+			body = JSON.parse(text);
+		} catch (_e) { /* ignore parse errors */ }
 	}
 
 	params.assert ??= true; // default is true
@@ -530,7 +529,7 @@ const _fetch = async (
 		// built-in guess. If a user-provided extractor throws, we must not let
 		// it replace the real HTTP error — fall back to statusText.
 		const tryExtract = (
-			fn: ErrorMessageExtractor | null | undefined
+			fn: ErrorMessageExtractor | null | undefined,
 		): string | null => {
 			if (!fn) return null;
 			try {
@@ -547,7 +546,7 @@ const _fetch = async (
 					b?.message ||
 					b?.error ||
 					_response?.statusText ||
-					"Unknown error"
+					"Unknown error",
 			);
 			if (msg.length > 255) msg = `[Shortened]: ${msg.slice(0, 255)}`;
 			return msg;
@@ -589,7 +588,7 @@ export class HttpApi {
 		defaults?:
 			| Partial<BaseFetchParams>
 			| (() => Promise<Partial<BaseFetchParams>>),
-		factoryErrorMessageExtractor?: ErrorMessageExtractor | null | undefined
+		factoryErrorMessageExtractor?: ErrorMessageExtractor | null | undefined,
 	) {
 		this.#base = base;
 		this.#defaults = defaults;
@@ -606,7 +605,7 @@ export class HttpApi {
 
 	#merge<T = unknown>(
 		a: Record<string, unknown>,
-		b: Record<string, unknown>
+		b: Record<string, unknown>,
 	): T {
 		return deepMerge<T>(a, b);
 	}
@@ -672,7 +671,7 @@ export class HttpApi {
 		params?: FetchParams,
 		respHeaders?: ResponseHeaders | null,
 		errorMessageExtractor?: ErrorMessageExtractor | null,
-		_dumpParams?: boolean
+		_dumpParams?: boolean,
 	): Promise<T>;
 
 	async get(
@@ -680,7 +679,7 @@ export class HttpApi {
 		paramsOrOptions?: FetchParams | GetOptions,
 		respHeaders?: ResponseHeaders | null,
 		errorMessageExtractor?: ErrorMessageExtractor | null,
-		_dumpParams = false
+		_dumpParams = false,
 	): Promise<unknown> {
 		const {
 			params,
@@ -695,7 +694,7 @@ export class HttpApi {
 			errorExtractor ?? this.#factoryErrorMessageExtractor,
 			this.#requestInterceptor,
 			this.#responseInterceptor,
-			_dumpParams
+			_dumpParams,
 		);
 	}
 
@@ -713,7 +712,7 @@ export class HttpApi {
 		params?: FetchParams,
 		respHeaders?: ResponseHeaders | null,
 		errorMessageExtractor?: ErrorMessageExtractor | null,
-		_dumpParams?: boolean
+		_dumpParams?: boolean,
 	): Promise<T>;
 
 	async post(
@@ -722,7 +721,7 @@ export class HttpApi {
 		params?: FetchParams,
 		respHeaders?: ResponseHeaders | null,
 		errorMessageExtractor?: ErrorMessageExtractor | null,
-		_dumpParams = false
+		_dumpParams = false,
 	): Promise<unknown> {
 		return await this.#body(
 			"POST",
@@ -731,7 +730,7 @@ export class HttpApi {
 			params,
 			respHeaders,
 			errorMessageExtractor,
-			_dumpParams
+			_dumpParams,
 		);
 	}
 
@@ -744,7 +743,7 @@ export class HttpApi {
 		params?: FetchParams,
 		respHeaders?: ResponseHeaders | null,
 		errorMessageExtractor?: ErrorMessageExtractor | null,
-		_dumpParams?: boolean
+		_dumpParams?: boolean,
 	): Promise<T>;
 	async put(
 		path: string,
@@ -752,7 +751,7 @@ export class HttpApi {
 		params?: FetchParams,
 		respHeaders?: ResponseHeaders | null,
 		errorMessageExtractor?: ErrorMessageExtractor | null,
-		_dumpParams = false
+		_dumpParams = false,
 	): Promise<unknown> {
 		return await this.#body(
 			"PUT",
@@ -761,7 +760,7 @@ export class HttpApi {
 			params,
 			respHeaders,
 			errorMessageExtractor,
-			_dumpParams
+			_dumpParams,
 		);
 	}
 
@@ -774,7 +773,7 @@ export class HttpApi {
 		params?: FetchParams,
 		respHeaders?: ResponseHeaders | null,
 		errorMessageExtractor?: ErrorMessageExtractor | null,
-		_dumpParams?: boolean
+		_dumpParams?: boolean,
 	): Promise<T>;
 	async patch(
 		path: string,
@@ -782,7 +781,7 @@ export class HttpApi {
 		params?: FetchParams,
 		respHeaders?: ResponseHeaders | null,
 		errorMessageExtractor?: ErrorMessageExtractor | null,
-		_dumpParams = false
+		_dumpParams = false,
 	): Promise<unknown> {
 		return await this.#body(
 			"PATCH",
@@ -791,7 +790,7 @@ export class HttpApi {
 			params,
 			respHeaders,
 			errorMessageExtractor,
-			_dumpParams
+			_dumpParams,
 		);
 	}
 
@@ -808,7 +807,7 @@ export class HttpApi {
 		params?: FetchParams,
 		respHeaders?: ResponseHeaders | null,
 		errorMessageExtractor?: ErrorMessageExtractor | null,
-		_dumpParams?: boolean
+		_dumpParams?: boolean,
 	): Promise<T>;
 	async del(
 		path: string,
@@ -816,7 +815,7 @@ export class HttpApi {
 		params?: FetchParams,
 		respHeaders?: ResponseHeaders | null,
 		errorMessageExtractor?: ErrorMessageExtractor | null,
-		_dumpParams = false
+		_dumpParams = false,
 	): Promise<unknown> {
 		return await this.#body(
 			"DELETE",
@@ -825,7 +824,7 @@ export class HttpApi {
 			params,
 			respHeaders,
 			errorMessageExtractor,
-			_dumpParams
+			_dumpParams,
 		);
 	}
 
@@ -836,7 +835,7 @@ export class HttpApi {
 		params: FetchParams | undefined,
 		respHeaders: ResponseHeaders | null | undefined,
 		errorMessageExtractor: ErrorMessageExtractor | null | undefined,
-		_dumpParams: boolean
+		_dumpParams: boolean,
 	): Promise<unknown> {
 		const {
 			data,
@@ -847,7 +846,7 @@ export class HttpApi {
 			dataOrOptions,
 			params,
 			respHeaders,
-			errorMessageExtractor
+			errorMessageExtractor,
 		);
 
 		path = this.#buildPath(path, this.#base);
@@ -862,7 +861,7 @@ export class HttpApi {
 			errorExtractor ?? this.#factoryErrorMessageExtractor,
 			this.#requestInterceptor,
 			this.#responseInterceptor,
-			_dumpParams
+			_dumpParams,
 		);
 	}
 
@@ -912,7 +911,7 @@ export function createHttpApi(
 	defaults?:
 		| Partial<BaseFetchParams>
 		| (() => Promise<Partial<BaseFetchParams>>),
-	factoryErrorMessageExtractor?: ErrorMessageExtractor | null | undefined
+	factoryErrorMessageExtractor?: ErrorMessageExtractor | null | undefined,
 ): HttpApi {
 	return new HttpApi(base, defaults, factoryErrorMessageExtractor);
 }

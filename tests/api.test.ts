@@ -158,7 +158,7 @@ Deno.test("createHttpApi error { assert: false } does not throw", async () => {
 	const r = (await api.get(
 		`${url}/asdf`,
 		{ assert: false },
-		respHeaders
+		respHeaders,
 	)) as Record<string, unknown>;
 	assertEquals((r.error as Record<string, unknown>).message, CUSTOM_ERR_MSG);
 	assertEquals(respHeaders.__http_status_code__, 404);
@@ -176,7 +176,7 @@ Deno.test("custom local error message extractor", async () => {
 				return (
 					body as Record<string, Record<string, string>>
 				).error.message.toUpperCase();
-			}
+			},
 		);
 		assert(false); // must not be reached
 	} catch (e) {
@@ -195,7 +195,7 @@ Deno.test("custom factory error message extractor", async () => {
 			return (
 				body as Record<string, Record<string, string>>
 			).error.message.toUpperCase();
-		}
+		},
 	);
 
 	try {
@@ -212,7 +212,7 @@ Deno.test("custom factory error message extractor", async () => {
 Deno.test("custom global error message extractor", async () => {
 	createHttpApi.defaultErrorMessageExtractor = (
 		body: unknown,
-		_resp: Response
+		_resp: Response,
 	) => {
 		return (
 			body as Record<string, Record<string, string>>
@@ -240,7 +240,7 @@ Deno.test("createHttpApi POST", async () => {
 		`${url}/echo`,
 		{ hey: "ho" },
 		{ headers: { x: "yo" } },
-		respHeaders
+		respHeaders,
 	)) as Record<string, unknown>;
 	assertEquals(r.hey, "ho");
 	assertEquals(respHeaders.__http_status_code__, 200);
@@ -262,7 +262,7 @@ Deno.test("createHttpApi merge default params", async () => {
 		{ headers: { hey: "ho" } },
 		null,
 		null,
-		true
+		true,
 	)) as DumpedParams;
 
 	assertEquals(params.headers.authorization, "Bearer foo");
@@ -277,10 +277,10 @@ Deno.test("url build", () => {
 	assertEquals(createHttpApi().url("/foo"), "/foo");
 	assertEquals(
 		createHttpApi("http://example").url("/foo"),
-		"http://example/foo"
+		"http://example/foo",
 	);
 	assertEquals(
 		createHttpApi("http://ignored").url("http://another/foo"),
-		"http://another/foo"
+		"http://another/foo",
 	);
 });
