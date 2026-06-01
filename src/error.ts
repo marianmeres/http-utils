@@ -148,6 +148,35 @@ class ServiceUnavailable extends HttpError {
 	public override statusText = HTTP_STATUS.ERROR_SERVER.SERVICE_UNAVAILABLE.TEXT;
 }
 
+// Transport-level error (no HTTP response was received)
+
+/**
+ * Transport-level failure: DNS resolution failure, refused connection, connect
+ * timeout, unreachable host, etc. No HTTP response was received, so `status` is
+ * `0` (the de-facto web convention for network-level failures, mirroring
+ * `XMLHttpRequest.status`). Thrown by `fetchOrThrow` (and, by extension, by the
+ * `HttpApi` client) with the underlying transport error attached as `cause`, so
+ * the real reason (`ENOTFOUND`, `ECONNREFUSED`, ...) is never swallowed behind
+ * an opaque "fetch failed".
+ *
+ * @example
+ * ```ts
+ * try {
+ *   await api.get("/resource");
+ * } catch (error) {
+ *   if (error instanceof HTTP_ERROR.NetworkError) {
+ *     console.log(error.message); // e.g. "GET unreachable (https://...): ECONNREFUSED"
+ *     console.log(error.cause);   // the underlying transport error
+ *   }
+ * }
+ * ```
+ */
+class NetworkError extends HttpError {
+	public override name = 'HttpNetworkError';
+	public override status = 0;
+	public override statusText = 'Network Error';
+}
+
 // Export individual error classes for direct imports
 export {
 	HttpError,
@@ -169,6 +198,8 @@ export {
 	NotImplemented,
 	BadGateway,
 	ServiceUnavailable,
+	// Transport error
+	NetworkError,
 };
 
 /**
@@ -211,6 +242,8 @@ export const HTTP_ERROR = {
 	NotImplemented,
 	BadGateway,
 	ServiceUnavailable,
+	// transport
+	NetworkError,
 };
 
 const _wellKnownCtorMap = {

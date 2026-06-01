@@ -12,6 +12,7 @@ Opinionated, lightweight HTTP client wrapper for `fetch` with type-safe errors a
 - 🔧 **Convenient defaults** - Auto JSON parsing, Bearer tokens, base URLs
 - 🪶 **Lightweight** - Zero dependencies, thin wrapper over native `fetch`
 - 🎨 **Flexible error handling** - Three-tier error message extraction (local → factory → global)
+- 🛰️ **No swallowed transport errors** - DNS/connection failures surface the host and real reason instead of an opaque "fetch failed"
 - 📦 **Deno & Node.js** - Works in both runtimes
 - 🦾 **Generic return types** - Optional type parameters for typed responses
 
@@ -131,6 +132,12 @@ try {
   if (error instanceof NotFound) {
     console.log("Not found:", error.body);
   }
+  // Transport-level failures (DNS, refused connection, unreachable host) throw
+  // a NetworkError (status 0) instead of an opaque "fetch failed":
+  if (error instanceof HTTP_ERROR.NetworkError) {
+    console.log(error.message); // e.g. "GET unreachable (https://...): ECONNREFUSED"
+    console.log(error.cause);   // underlying transport error
+  }
   // All errors have: status, statusText, body, cause
 }
 ```
@@ -171,6 +178,22 @@ api.onRequest((init, { method, url }) => {
 For complete API documentation including all error classes, HTTP status codes, types, and utilities, see **[API.md](API.md)**.
 
 ## Utilities
+
+### `fetchOrThrow(input, init?, what?)`
+
+Wraps the native `fetch` so a transport-level failure surfaces the target host and the real reason instead of an opaque `TypeError: fetch failed`. On failure it throws a `NetworkError` (in the `HTTP_ERROR` namespace) whose message includes the URL and reason, and whose `cause` is the underlying transport error. Deliberate `AbortError`/`TimeoutError` are re-thrown untouched. The `HttpApi` client uses this internally — reach for it directly when wrapping your own `fetch` calls.
+
+```ts
+import { fetchOrThrow, HTTP_ERROR } from "@marianmeres/http-utils";
+
+try {
+  const res = await fetchOrThrow("https://issuer.example.com/jwks", undefined, "Token issuer");
+} catch (e) {
+  if (e instanceof HTTP_ERROR.NetworkError) {
+    console.log(e.message); // "Token issuer unreachable (https://issuer.example.com/jwks): ENOTFOUND"
+  }
+}
+```
 
 ### `getErrorMessage(error)`
 

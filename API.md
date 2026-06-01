@@ -546,6 +546,14 @@ class HttpError extends Error {
 | `BadGateway` | 502 | Bad Gateway |
 | `ServiceUnavailable` | 503 | Service Unavailable |
 
+### Transport Errors
+
+| Class | Status | Description |
+|-------|--------|-------------|
+| `NetworkError` | 0 | Transport-level failure — DNS failure, refused connection, connect timeout, unreachable host. No HTTP response was received (hence `status` is `0`). Thrown by [`fetchOrThrow`](#fetchorthrow) and the `HttpApi` client; the underlying transport error is attached as `cause`. |
+
+`NetworkError` extends `HttpError`, so it is caught by `instanceof HTTP_ERROR.HttpError` as well.
+
 ### HTTP_ERROR Namespace
 
 All error classes are available via the `HTTP_ERROR` namespace:
@@ -638,6 +646,40 @@ const info = HTTP_STATUS.findByCode(404);
 ---
 
 ## Utilities
+
+### fetchOrThrow
+
+Wraps the native `fetch` so a transport-level failure surfaces the target host and the real reason instead of an opaque `TypeError: fetch failed`. Node/undici buries the actual code (`ENOTFOUND`, `ECONNREFUSED`, `UND_ERR_CONNECT_TIMEOUT`, …) on `err.cause`, away from the message and stack. On such a failure this throws a [`NetworkError`](#transport-errors) whose message includes the URL and reason, and whose `cause` is the underlying transport error. Deliberate cancellations (`AbortError`) and timeouts (`TimeoutError`) are re-thrown untouched.
+
+The `HttpApi` client uses this internally, so all of its requests surface the real reason too — you only need `fetchOrThrow` directly when wrapping your own `fetch` calls.
+
+```ts
+function fetchOrThrow(
+  input: string | URL | Request,
+  init?: RequestInit,
+  what?: string
+): Promise<Response>
+```
+
+Like the native `fetch`, this does **not** throw on non-2xx HTTP statuses — only on transport-level failures. The optional `what` is a label describing the target (e.g. `"Token issuer"`) used to prefix the error message.
+
+**Example:**
+```ts
+import { fetchOrThrow, HTTP_ERROR } from "@marianmeres/http-utils";
+
+try {
+  const res = await fetchOrThrow(
+    "https://issuer.example.com/jwks",
+    undefined,
+    "Token issuer"
+  );
+} catch (e) {
+  if (e instanceof HTTP_ERROR.NetworkError) {
+    console.log(e.message); // "Token issuer unreachable (https://issuer.example.com/jwks): ENOTFOUND"
+    console.log(e.cause);   // underlying transport error
+  }
+}
+```
 
 ### createHttpError
 

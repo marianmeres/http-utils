@@ -4,7 +4,7 @@
 
 ```yaml
 name: "@marianmeres/http-utils"
-version: "2.5.1"
+version: "2.8.0"
 license: MIT
 runtime: deno, node
 type: library
@@ -132,6 +132,7 @@ HTTP_ERROR.InternalServerError // 500
 HTTP_ERROR.NotImplemented   // 501
 HTTP_ERROR.BadGateway       // 502
 HTTP_ERROR.ServiceUnavailable // 503
+HTTP_ERROR.NetworkError     // 0 (transport-level failure: DNS/refused/timeout/unreachable; extends HttpError, cause = underlying error)
 ```
 
 ### Helper Functions
@@ -146,6 +147,9 @@ function opts<T extends GetOptions | DataOptions>(options: T): T
 ```typescript
 function createHttpError(code: number | string, message?: string | null, body?: unknown, cause?: unknown): HttpError
 function getErrorMessage(e: unknown, stripErrorPrefix?: boolean): string
+// Wraps fetch; on transport failure throws NetworkError("<what> unreachable (<url>): <reason>", { cause }).
+// AbortError/TimeoutError pass through untouched. Used internally by HttpApi.
+function fetchOrThrow(input: string | URL | Request, init?: RequestInit, what?: string): Promise<Response>
 ```
 
 ### HTTP Status Codes
@@ -178,6 +182,7 @@ class HTTP_STATUS {
 7. **URL normalization**: `#url(path)` strips trailing `/` from base and ensures leading `/` on path, so `base + path` never produces `//` or missing `/`
 8. **Timeout**: `params.timeout` (ms) aborts via `AbortSignal.timeout`; composed with `params.signal` via `AbortSignal.any`
 9. **Query**: `params.query` object appended as URL search params; `null`/`undefined` skipped, arrays → repeated keys
+10. **Transport errors**: connectivity failures (DNS, refused connection, unreachable host) throw `HTTP_ERROR.NetworkError` (status 0) via `fetchOrThrow`, with the real reason in the message and the underlying error as `cause` — never an opaque "fetch failed". Deliberate `AbortError`/`TimeoutError` are not wrapped.
 
 ## Request Body Serialization
 

@@ -5,7 +5,7 @@
  * Provides a convenient wrapper over the native `fetch` API with sensible defaults.
  */
 
-import { createHttpError } from "./error.ts";
+import { createHttpError, getErrorMessage, NetworkError } from "./error.ts";
 
 /**
  * Request body data type.
@@ -386,6 +386,78 @@ function buildRequest(
 	return { url, init };
 }
 
+/** Best-effort human-readable description of a `fetch` target for error messages. */
+function _describeFetchTarget(input: Parameters<typeof fetch>[0]): string {
+	if (typeof input === "string") return input;
+	if (input instanceof URL) return input.href;
+	return (input as Request)?.url ?? String(input);
+}
+
+/**
+ * Wraps the native `fetch` so a transport-level failure surfaces the target host
+ * and the real reason instead of an opaque "fetch failed".
+ *
+ * Node/undici collapses DNS failures, refused connections and connect timeouts
+ * into a `TypeError: fetch failed` whose actual code (`ENOTFOUND`,
+ * `ECONNREFUSED`, `UND_ERR_CONNECT_TIMEOUT`, ...) lives on `err.cause` and is
+ * absent from the message and stack. On such a failure this throws a
+ * `NetworkError` (see {@link HTTP_ERROR}) whose message includes the URL and the
+ * resolved reason, and whose `cause` is the underlying transport error (so both
+ * `error.message` and `getErrorMessage(error)` report the real reason).
+ *
+ * Deliberate cancellations (`AbortError`) and timeouts (`TimeoutError`) are
+ * re-thrown untouched — they already carry clear semantics and must not be
+ * masked as "host unreachable".
+ *
+ * @param input - The `fetch` resource (URL string, `URL`, or `Request`).
+ * @param init - The `fetch` `RequestInit` options.
+ * @param what - Optional label describing the target (e.g. "Token issuer"),
+ *   used to prefix the error message.
+ *
+ * @returns The `Response`. This does NOT throw on non-2xx HTTP statuses — only
+ *   on transport-level failures, exactly like the native `fetch`.
+ *
+ * @throws A `NetworkError` on a transport-level failure (DNS, refused
+ *   connection, unreachable host, ...).
+ *
+ * @example
+ * ```ts
+ * import { fetchOrThrow, HTTP_ERROR } from "@marianmeres/http-utils";
+ *
+ * try {
+ *   const res = await fetchOrThrow("https://issuer.example.com/jwks", undefined, "Token issuer");
+ * } catch (e) {
+ *   if (e instanceof HTTP_ERROR.NetworkError) {
+ *     // e.message → "Token issuer unreachable (https://issuer.example.com/jwks): ENOTFOUND"
+ *     // e.cause   → underlying transport error
+ *   }
+ * }
+ * ```
+ */
+export async function fetchOrThrow(
+	input: Parameters<typeof fetch>[0],
+	init?: Parameters<typeof fetch>[1],
+	what?: string
+): Promise<Response> {
+	try {
+		return await fetch(input, init);
+	} catch (err) {
+		const name = (err as Error)?.name;
+		// Preserve deliberate cancellations and timeouts as-is.
+		if (name === "AbortError" || name === "TimeoutError") throw err;
+		// undici/Node bury the real reason on `err.cause`; prefer it so both
+		// `.message` and `getErrorMessage(networkError)` surface ENOTFOUND/etc.
+		// rather than re-surfacing the opaque outer "fetch failed".
+		const underlying = (err as { cause?: unknown })?.cause ?? err;
+		const reason = getErrorMessage(underlying);
+		const url = _describeFetchTarget(input);
+		const message = what
+			? `${what} unreachable (${url}): ${reason}`
+			: `Network request to ${url} failed: ${reason}`;
+		throw new NetworkError(message, { cause: underlying });
+	}
+}
+
 const _fetch = async (
 	params: BaseFetchParams,
 	respHeaders: ResponseHeaders | null = null,
@@ -406,7 +478,7 @@ const _fetch = async (
 		if (patched) init = patched;
 	}
 
-	let r = await fetch(url, init);
+	let r = await fetchOrThrow(url, init, params.method);
 
 	if (responseInterceptor) {
 		const patched = await responseInterceptor(r, {

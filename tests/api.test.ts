@@ -127,6 +127,21 @@ Deno.test("createHttpApi error", async () => {
 	}
 });
 
+Deno.test("createHttpApi transport failure surfaces NetworkError", async () => {
+	const api = createHttpApi();
+
+	try {
+		// reserved TLD (RFC 6761) — guaranteed DNS failure
+		await api.get("http://does-not-exist.invalid");
+		assert(false); // must not be reached
+	} catch (e) {
+		assert(e instanceof HTTP_ERROR.NetworkError);
+		assert((e as Error).message.includes("does-not-exist.invalid"));
+		// the method is used as the label
+		assert((e as Error).message.includes("GET unreachable"));
+	}
+});
+
 Deno.test("createHttpApi error { raw: true }", async () => {
 	const api = createHttpApi();
 
