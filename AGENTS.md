@@ -160,10 +160,15 @@ function createHttpError(
 function getErrorMessage(e: unknown, stripErrorPrefix?: boolean): string;
 // Wraps fetch; on transport failure throws NetworkError("<what> unreachable (<url>): <reason>", { cause }).
 // AbortError/TimeoutError pass through untouched. Used internally by HttpApi.
+// 3rd arg is a label string OR FetchOrThrowOptions { what?, onRequest?, onError? } (pure observers; a string normalizes to { what }).
+// onRequest fires before dispatch (throw => request not sent). onError fires on every failure
+//   with kind: "abort" | "timeout" | "network" (throw => swallowed, real error preserved).
+// Global defaults (overridable per call; resolution: per-call ?? global; instruments HttpApi too):
+//   fetchOrThrow.global.onRequest / fetchOrThrow.global.onError
 function fetchOrThrow(
 	input: string | URL | Request,
 	init?: RequestInit,
-	what?: string,
+	whatOrOptions?: string | FetchOrThrowOptions,
 ): Promise<Response>;
 ```
 
@@ -209,6 +214,9 @@ class HTTP_STATUS {
     host) throw `HTTP_ERROR.NetworkError` (status 0) via `fetchOrThrow`, with the real
     reason in the message and the underlying error as `cause` — never an opaque "fetch
     failed". Deliberate `AbortError`/`TimeoutError` are not wrapped.
+11. **Request tracing**: `fetchOrThrow.global.onRequest` / `onError` are observer-only
+    hooks (no recovery/transform), overridable per call (`per-call ?? global`). They also
+    fire for `HttpApi` requests, since the client routes through `fetchOrThrow`.
 
 ## Request Body Serialization
 

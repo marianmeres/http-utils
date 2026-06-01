@@ -704,13 +704,14 @@ too — you only need `fetchOrThrow` directly when wrapping your own `fetch` cal
 function fetchOrThrow(
 	input: string | URL | Request,
 	init?: RequestInit,
-	what?: string,
+	whatOrOptions?: string | FetchOrThrowOptions,
 ): Promise<Response>;
 ```
 
 Like the native `fetch`, this does **not** throw on non-2xx HTTP statuses — only on
-transport-level failures. The optional `what` is a label describing the target (e.g.
-`"Token issuer"`) used to prefix the error message.
+transport-level failures. The 3rd argument is either a label string (e.g.
+`"Token issuer"`) used to prefix the error message, or a `FetchOrThrowOptions` object
+carrying that label plus observer hooks (a bare string is normalized to `{ what }`).
 
 **Example:**
 
@@ -729,6 +730,54 @@ try {
 		console.log(e.cause); // underlying transport error
 	}
 }
+```
+
+#### Observer hooks & global defaults
+
+```ts
+interface FetchOrThrowOptions {
+	/** Label for the target, used to prefix the error message. */
+	what?: string;
+	/** Fires synchronously before the request is dispatched. If it throws, the request is NOT sent. */
+	onRequest?: (info: { url: string; method?: string; what?: string }) => void;
+	/** Fires before a failure is (re-)thrown. A throw here is swallowed. */
+	onError?: (info: {
+		error: unknown;
+		url: string;
+		what?: string;
+		kind: "abort" | "timeout" | "network";
+	}) => void;
+}
+
+// Observer hooks only — `what` is per-call by nature.
+type FetchOrThrowGlobalOptions = Pick<FetchOrThrowOptions, "onRequest" | "onError">;
+```
+
+`onRequest`/`onError` are **pure observers**: their return value is ignored and they
+cannot recover or transform the request/error. Reach for them to trace requests — notably
+the _hang_ case, where neither a response nor an error ever arrives. For recovery or
+retries use the `HttpApi` interceptors or your own `catch`.
+
+- `onError` fires for **every** terminal failure; `kind`
+  (`"abort" | "timeout" | "network"`) lets you filter — e.g. skip deliberate aborts. Only
+  a `"network"` failure is wrapped in a `NetworkError`; aborts/timeouts propagate
+  untouched (the `error` passed to the hook is always the one that actually throws).
+- A throwing `onRequest` aborts before the request is sent (clear consumer bug, no
+  original error to lose). A throwing `onError` is **swallowed**, so a broken hook can
+  never mask the real error. This asymmetry is intentional.
+
+Set defaults once on `fetchOrThrow.global`; per-call options win (resolution is
+`per-call ?? global`, an override — not a chain). Because `HttpApi` routes through
+`fetchOrThrow`, these globals instrument the client's requests too.
+
+```ts
+// app-wide defaults (also fire for every HttpApi request)
+fetchOrThrow.global.onRequest = ({ method, url }) => console.debug(`→ ${method} ${url}`);
+fetchOrThrow.global.onError = ({ url, kind }) =>
+	kind !== "abort" && console.error(`✗ ${url}`);
+
+// per-call object form (overrides the global onRequest for this call only)
+await fetchOrThrow(url, init, { what: "Token issuer", onRequest: () => {} });
 ```
 
 ### createHttpError

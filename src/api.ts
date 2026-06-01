@@ -389,6 +389,80 @@ function _describeFetchTarget(input: Parameters<typeof fetch>[0]): string {
 }
 
 /**
+ * Options for {@link fetchOrThrow}. Pass as the 3rd argument in place of a bare
+ * `what` string (a string is normalized to `{ what }`).
+ *
+ * `onRequest`/`onError` are **pure observers** — their return value is ignored,
+ * they cannot recover or transform the request/error. For recovery or retries
+ * use the {@link HttpApi} interceptors or your own `catch`.
+ */
+export interface FetchOrThrowOptions {
+	/** Human-readable label for the target (e.g. "Token issuer"), used in error messages. */
+	what?: string;
+	/**
+	 * Called synchronously just before the request is dispatched. No-op by
+	 * default. Useful for request tracing — including the hang case where
+	 * neither a response nor an error ever arrives. If this throws, the request
+	 * is NOT sent (a throwing tracer is a clear consumer bug, and there is no
+	 * original error to preserve — unlike {@link FetchOrThrowOptions.onError}).
+	 */
+	onRequest?: (info: { url: string; method?: string; what?: string }) => void;
+	/**
+	 * Called just before a transport-level failure is (re-)thrown. Pure observer:
+	 * its return value is ignored and the original error always propagates. A
+	 * throw here is swallowed so a broken hook can never mask the real error.
+	 * `kind` classifies the failure so callers can, e.g., skip deliberate aborts.
+	 */
+	onError?: (info: {
+		error: unknown;
+		url: string;
+		what?: string;
+		kind: "abort" | "timeout" | "network";
+	}) => void;
+}
+
+/**
+ * Global defaults for {@link fetchOrThrow}, exposed as `fetchOrThrow.global` and
+ * overridable per call (resolution is `per-call ?? global`). Observer hooks only
+ * — `what` is per-call by nature, so it is intentionally excluded.
+ */
+export type FetchOrThrowGlobalOptions = Pick<
+	FetchOrThrowOptions,
+	"onRequest" | "onError"
+>;
+
+// `Symbol.for` + `globalThis` so multiple bundled copies of this package still
+// share one config object (same approach as `@marianmeres/clog`'s global state).
+const _FOT_GLOBAL_KEY = Symbol.for("@marianmeres/http-utils/fetchOrThrow");
+const _FOT_GLOBAL: FetchOrThrowGlobalOptions =
+	// deno-lint-ignore no-explicit-any
+	((globalThis as any)[_FOT_GLOBAL_KEY] ??= {
+		onRequest: undefined,
+		onError: undefined,
+	});
+
+/**
+ * Invoke an `onError` observer defensively: `url` is only computed when a hook
+ * is present, and a throwing hook is swallowed so it can never replace the real
+ * error that is about to propagate.
+ */
+function _notifyFetchError(
+	hook: FetchOrThrowOptions["onError"],
+	error: unknown,
+	describe: (input: Parameters<typeof fetch>[0]) => string,
+	input: Parameters<typeof fetch>[0],
+	what: string | undefined,
+	kind: "abort" | "timeout" | "network",
+): void {
+	if (!hook) return;
+	try {
+		hook({ error, url: describe(input), what, kind });
+	} catch {
+		/* observer hooks must not alter control flow */
+	}
+}
+
+/**
  * Wraps the native `fetch` so a transport-level failure surfaces the target host
  * and the real reason instead of an opaque "fetch failed".
  *
@@ -404,10 +478,18 @@ function _describeFetchTarget(input: Parameters<typeof fetch>[0]): string {
  * re-thrown untouched — they already carry clear semantics and must not be
  * masked as "host unreachable".
  *
+ * Optional observer hooks (`onRequest`/`onError`, see {@link FetchOrThrowOptions})
+ * can trace the request without wrapping the call site in `try/catch`; the most
+ * useful case is detecting a hang, where neither a response nor an error ever
+ * arrives. Defaults can be set once on `fetchOrThrow.global` and overridden per
+ * call (resolution is `per-call ?? global`). Because {@link HttpApi} routes every
+ * request through this function, the global hooks instrument it too.
+ *
  * @param input - The `fetch` resource (URL string, `URL`, or `Request`).
  * @param init - The `fetch` `RequestInit` options.
- * @param what - Optional label describing the target (e.g. "Token issuer"),
- *   used to prefix the error message.
+ * @param what - Either a label describing the target (e.g. "Token issuer"), used
+ *   to prefix the error message, or a {@link FetchOrThrowOptions} object carrying
+ *   that label plus the `onRequest`/`onError` observer hooks.
  *
  * @returns The `Response`. This does NOT throw on non-2xx HTTP statuses — only
  *   on transport-level failures, exactly like the native `fetch`.
@@ -418,6 +500,11 @@ function _describeFetchTarget(input: Parameters<typeof fetch>[0]): string {
  * @example
  * ```ts
  * import { fetchOrThrow, HTTP_ERROR } from "@marianmeres/http-utils";
+ *
+ * // Configure tracing once, app-wide (also instruments the HttpApi client):
+ * fetchOrThrow.global.onRequest = ({ method, url }) => console.debug(`→ ${method} ${url}`);
+ * fetchOrThrow.global.onError = ({ url, kind }) =>
+ *   kind !== "abort" && console.error(`✗ ${url}`);
  *
  * try {
  *   const res = await fetchOrThrow("https://issuer.example.com/jwks", undefined, "Token issuer");
@@ -432,26 +519,61 @@ function _describeFetchTarget(input: Parameters<typeof fetch>[0]): string {
 export async function fetchOrThrow(
 	input: Parameters<typeof fetch>[0],
 	init?: Parameters<typeof fetch>[1],
-	what?: string,
+	what?: string | FetchOrThrowOptions,
 ): Promise<Response> {
+	const opts: FetchOrThrowOptions = typeof what === "string" ? { what } : (what ?? {});
+	const label = opts.what;
+	// Per-call wins over the global default (override, not chain).
+	const onRequest = opts.onRequest ?? _FOT_GLOBAL.onRequest;
+	const onError = opts.onError ?? _FOT_GLOBAL.onError;
+
+	if (onRequest) {
+		const method = (init as { method?: string } | undefined)?.method ??
+			(input instanceof Request ? input.method : undefined);
+		onRequest({ url: _describeFetchTarget(input), method, what: label });
+	}
+
 	try {
 		return await fetch(input, init);
 	} catch (err) {
 		const name = (err as Error)?.name;
+		const kind: "abort" | "timeout" | "network" = name === "AbortError"
+			? "abort"
+			: name === "TimeoutError"
+			? "timeout"
+			: "network";
+
 		// Preserve deliberate cancellations and timeouts as-is.
-		if (name === "AbortError" || name === "TimeoutError") throw err;
+		if (kind !== "network") {
+			_notifyFetchError(onError, err, _describeFetchTarget, input, label, kind);
+			throw err;
+		}
+
 		// undici/Node bury the real reason on `err.cause`; prefer it so both
 		// `.message` and `getErrorMessage(networkError)` surface ENOTFOUND/etc.
 		// rather than re-surfacing the opaque outer "fetch failed".
 		const underlying = (err as { cause?: unknown })?.cause ?? err;
 		const reason = getErrorMessage(underlying);
 		const url = _describeFetchTarget(input);
-		const message = what
-			? `${what} unreachable (${url}): ${reason}`
+		const message = label
+			? `${label} unreachable (${url}): ${reason}`
 			: `Network request to ${url} failed: ${reason}`;
-		throw new NetworkError(message, { cause: underlying });
+		const networkError = new NetworkError(message, { cause: underlying });
+		_notifyFetchError(onError, networkError, () => url, input, label, kind);
+		throw networkError;
 	}
 }
+
+/**
+ * Global defaults for {@link fetchOrThrow}'s observer hooks, overridable per call.
+ * Mirrors `createHttpApi.defaultErrorMessageExtractor` and `createClog.global`.
+ *
+ * @example
+ * ```ts
+ * fetchOrThrow.global.onRequest = ({ method, url }) => console.debug(`→ ${method} ${url}`);
+ * ```
+ */
+fetchOrThrow.global = _FOT_GLOBAL;
 
 const _fetch = async (
 	params: BaseFetchParams,

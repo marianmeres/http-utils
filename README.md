@@ -203,7 +203,7 @@ utilities, see **[API.md](API.md)**.
 
 ## Utilities
 
-### `fetchOrThrow(input, init?, what?)`
+### `fetchOrThrow(input, init?, whatOrOptions?)`
 
 Wraps the native `fetch` so a transport-level failure surfaces the target host and the
 real reason instead of an opaque `TypeError: fetch failed`. On failure it throws a
@@ -211,6 +211,9 @@ real reason instead of an opaque `TypeError: fetch failed`. On failure it throws
 and whose `cause` is the underlying transport error. Deliberate
 `AbortError`/`TimeoutError` are re-thrown untouched. The `HttpApi` client uses this
 internally — reach for it directly when wrapping your own `fetch` calls.
+
+The 3rd argument is either a label string or a `FetchOrThrowOptions` object carrying that
+label plus optional `onRequest`/`onError` observer hooks.
 
 ```ts
 import { fetchOrThrow, HTTP_ERROR } from "@marianmeres/http-utils";
@@ -227,6 +230,24 @@ try {
 	}
 }
 ```
+
+**Tracing requests.** The `onRequest`/`onError` hooks are pure observers (they can't
+recover or transform anything) — handy for logging, and the only way to catch a _hang_
+where neither a response nor an error ever arrives. Set defaults once on
+`fetchOrThrow.global` (overridable per call; resolution is `per-call ?? global`). Because
+`HttpApi` routes through `fetchOrThrow`, the global hooks instrument it too.
+
+```ts
+// app-wide defaults (also fire for every HttpApi request)
+fetchOrThrow.global.onRequest = ({ method, url }) => console.debug(`→ ${method} ${url}`);
+fetchOrThrow.global.onError = ({ url, kind }) =>
+	kind !== "abort" && console.error(`✗ ${url}`); // kind: "abort" | "timeout" | "network"
+
+// per-call override (here: silence the global tracer for one call)
+await fetchOrThrow(url, init, { what: "Token issuer", onRequest: () => {} });
+```
+
+See [API.md](./API.md#fetchorthrow) for the full options reference.
 
 ### `getErrorMessage(error)`
 

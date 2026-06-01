@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "@std/assert";
-import { createHttpApi, HTTP_ERROR } from "../src/mod.ts";
+import { createHttpApi, fetchOrThrow, HTTP_ERROR } from "../src/mod.ts";
 import { getAvailablePort, hostname } from "./_helpers.ts";
 import { register } from "node:module";
 
@@ -139,6 +139,28 @@ Deno.test("createHttpApi transport failure surfaces NetworkError", async () => {
 		assert((e as Error).message.includes("does-not-exist.invalid"));
 		// the method is used as the label
 		assert((e as Error).message.includes("GET unreachable"));
+	}
+});
+
+Deno.test("createHttpApi requests trigger fetchOrThrow.global hooks", async () => {
+	// HttpApi routes every request through fetchOrThrow, so a single global
+	// default instruments the client too.
+	let calls = 0;
+	let seenUrl = "";
+	let seenMethod: string | undefined;
+	fetchOrThrow.global.onRequest = (i) => {
+		calls++;
+		seenUrl = i.url;
+		seenMethod = i.method;
+	};
+	try {
+		const api = createHttpApi();
+		await api.get(`${url}/echo`);
+		assertEquals(calls, 1);
+		assert(seenUrl.includes("/echo"));
+		assertEquals(seenMethod, "GET");
+	} finally {
+		fetchOrThrow.global.onRequest = undefined;
 	}
 });
 

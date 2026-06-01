@@ -27,6 +27,8 @@ export {
 	type DataOptions,
 	type ErrorMessageExtractor,
 	fetchOrThrow,
+	type FetchOrThrowGlobalOptions,
+	type FetchOrThrowOptions,
 	type FetchParams,
 	type GetOptions,
 	HttpApi,
