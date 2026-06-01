@@ -674,8 +674,7 @@ const _fetch = async (
 			return msg;
 		};
 
-		const msg =
-			tryExtract(errorMessageExtractor) ??
+		const msg = tryExtract(errorMessageExtractor) ??
 			tryExtract(createHttpApi.defaultErrorMessageExtractor) ??
 			builtIn(body, r);
 
