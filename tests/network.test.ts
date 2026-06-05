@@ -156,6 +156,65 @@ Deno.test("fetchOrThrow swallows a throwing onError and propagates the real erro
 	}
 });
 
+// --- observer hooks (onResponse) ---
+
+Deno.test("fetchOrThrow onResponse fires after a successful request", async () => {
+	let calls = 0;
+	let info:
+		| {
+			url: string;
+			method?: string;
+			status: number;
+			ok: boolean;
+			durationMs: number;
+		}
+		| undefined;
+	const r = await fetchOrThrow(new URL("data:text/plain,hello"), undefined, {
+		onResponse: (i) => {
+			calls++;
+			info = i;
+		},
+	});
+	assert(r instanceof Response);
+	// the body must still be readable — the hook must not consume it
+	assertEquals(await r.text(), "hello");
+	assertEquals(calls, 1);
+	assertEquals(info!.status, 200);
+	assertEquals(info!.ok, true);
+	assert(info!.url.startsWith("data:text/plain"));
+	assert(typeof info!.durationMs === "number" && info!.durationMs >= 0);
+});
+
+Deno.test("fetchOrThrow onResponse does NOT fire on a transport failure", async () => {
+	let calls = 0;
+	await fetchOrThrow(DEAD_HOST, undefined, {
+		onResponse: () => calls++,
+	}).catch(() => {});
+	assertEquals(calls, 0);
+});
+
+Deno.test("fetchOrThrow onResponse fires for non-2xx responses too", async () => {
+	const ac = new AbortController();
+	const server = Deno.serve(
+		{ port: 0, signal: ac.signal, onListen: () => {} },
+		() => new Response("nope", { status: 503, statusText: "Service Unavailable" }),
+	);
+	const { port } = server.addr as Deno.NetAddr;
+	let info: { status: number; statusText: string; ok: boolean } | undefined;
+	try {
+		const r = await fetchOrThrow(`http://127.0.0.1:${port}/`, undefined, {
+			onResponse: (i) => (info = i),
+		});
+		await r.body?.cancel(); // drain to let the server settle
+		assertEquals(info!.status, 503);
+		assertEquals(info!.statusText, "Service Unavailable");
+		assertEquals(info!.ok, false);
+	} finally {
+		ac.abort();
+		await server.finished;
+	}
+});
+
 // --- global defaults (fetchOrThrow.global) ---
 
 Deno.test("fetchOrThrow.global.onRequest applies as a default", async () => {
@@ -181,5 +240,21 @@ Deno.test("fetchOrThrow per-call onRequest overrides the global default (not cha
 		assertEquals(globalCalls, 0); // override, not chain
 	} finally {
 		fetchOrThrow.global.onRequest = undefined;
+	}
+});
+
+Deno.test("fetchOrThrow.global.onResponse applies as a default", async () => {
+	let calls = 0;
+	let status = 0;
+	fetchOrThrow.global.onResponse = (i) => {
+		calls++;
+		status = i.status;
+	};
+	try {
+		await fetchOrThrow(new URL("data:text/plain,hi"));
+		assertEquals(calls, 1);
+		assertEquals(status, 200);
+	} finally {
+		fetchOrThrow.global.onResponse = undefined;
 	}
 });

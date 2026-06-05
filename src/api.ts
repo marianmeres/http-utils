@@ -408,6 +408,28 @@ export interface FetchOrThrowOptions {
 	 */
 	onRequest?: (info: { url: string; method?: string; what?: string }) => void;
 	/**
+	 * Called immediately after a response is received, before the body is touched.
+	 * Pure observer: its return value is ignored and a throw here is swallowed so a
+	 * broken hook can never affect the caller. This fires for ALL responses,
+	 * including non-2xx ones — it observes the transport completing, not HTTP
+	 * success (that distinction is in `ok`/`status`).
+	 *
+	 * The `headers` are passed through read-only. Do NOT read `response.body` from
+	 * here: the body is a single-use stream and consuming it would break the actual
+	 * caller. To log bodies, clone upstream or hook a layer that has already parsed
+	 * them. `durationMs` is the wall-clock time from just before `fetch` to here.
+	 */
+	onResponse?: (info: {
+		url: string;
+		method?: string;
+		what?: string;
+		status: number;
+		statusText: string;
+		ok: boolean;
+		headers: Headers;
+		durationMs: number;
+	}) => void;
+	/**
 	 * Called just before a transport-level failure is (re-)thrown. Pure observer:
 	 * its return value is ignored and the original error always propagates. A
 	 * throw here is swallowed so a broken hook can never mask the real error.
@@ -436,7 +458,7 @@ export interface FetchOrThrowOptions {
  */
 export type FetchOrThrowGlobalOptions = Pick<
 	FetchOrThrowOptions,
-	"onRequest" | "onError"
+	"onRequest" | "onResponse" | "onError"
 >;
 
 // `Symbol.for` + `globalThis` so multiple bundled copies of this package still
@@ -446,6 +468,7 @@ const _FOT_GLOBAL: FetchOrThrowGlobalOptions =
 	// deno-lint-ignore no-explicit-any
 	((globalThis as any)[_FOT_GLOBAL_KEY] ??= {
 		onRequest: undefined,
+		onResponse: undefined,
 		onError: undefined,
 	});
 
@@ -494,10 +517,12 @@ function _notifyFetchError(
  * re-thrown untouched — they already carry clear semantics and must not be
  * masked as "host unreachable".
  *
- * Optional observer hooks (`onRequest`/`onError`, see {@link FetchOrThrowOptions})
- * can trace the request without wrapping the call site in `try/catch`; the most
- * useful case is detecting a hang, where neither a response nor an error ever
- * arrives. Defaults can be set once on `fetchOrThrow.global` and overridden per
+ * Optional observer hooks (`onRequest`/`onResponse`/`onError`, see
+ * {@link FetchOrThrowOptions}) can trace the request without wrapping the call site
+ * in `try/catch`: `onResponse` fires for every received response (even non-2xx) so
+ * you can debug-log status/timing without consuming the body, and `onRequest`
+ * covers the hang case where neither a response nor an error ever arrives. Defaults
+ * can be set once on `fetchOrThrow.global` and overridden per
  * call (resolution is `per-call ?? global`). Because {@link HttpApi} routes every
  * request through this function, the global hooks instrument it too.
  *
@@ -519,6 +544,8 @@ function _notifyFetchError(
  *
  * // Configure tracing once, app-wide (also instruments the HttpApi client):
  * fetchOrThrow.global.onRequest = ({ method, url }) => console.debug(`→ ${method} ${url}`);
+ * fetchOrThrow.global.onResponse = ({ method, url, status, durationMs }) =>
+ *   console.debug(`← ${status} ${method} ${url} (${durationMs.toFixed(1)}ms)`);
  * fetchOrThrow.global.onError = ({ url, kind, reason }) =>
  *   kind !== "abort" && console.error(`✗ ${url}: ${reason}`);
  *
@@ -541,16 +568,40 @@ export async function fetchOrThrow(
 	const label = opts.what;
 	// Per-call wins over the global default (override, not chain).
 	const onRequest = opts.onRequest ?? _FOT_GLOBAL.onRequest;
+	const onResponse = opts.onResponse ?? _FOT_GLOBAL.onResponse;
 	const onError = opts.onError ?? _FOT_GLOBAL.onError;
 
+	// Resolved once and reused for whichever observers are present.
+	const method = (onRequest || onResponse)
+		? ((init as { method?: string } | undefined)?.method ??
+			(input instanceof Request ? input.method : undefined))
+		: undefined;
+
 	if (onRequest) {
-		const method = (init as { method?: string } | undefined)?.method ??
-			(input instanceof Request ? input.method : undefined);
 		onRequest({ url: _describeFetchTarget(input), method, what: label });
 	}
 
+	const startedAt = onResponse ? performance.now() : 0;
+
 	try {
-		return await fetch(input, init);
+		const response = await fetch(input, init);
+		if (onResponse) {
+			try {
+				onResponse({
+					url: _describeFetchTarget(input),
+					method,
+					what: label,
+					status: response.status,
+					statusText: response.statusText,
+					ok: response.ok,
+					headers: response.headers,
+					durationMs: performance.now() - startedAt,
+				});
+			} catch {
+				/* observer hooks must not alter control flow */
+			}
+		}
+		return response;
 	} catch (err) {
 		const name = (err as Error)?.name;
 		const kind: "abort" | "timeout" | "network" = name === "AbortError"
