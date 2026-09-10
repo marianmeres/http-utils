@@ -642,6 +642,115 @@ export async function fetchOrThrow(
  */
 fetchOrThrow.global = _FOT_GLOBAL;
 
+/**
+ * Request context attached as `cause` to every HTTP error thrown by an
+ * {@link HttpApi} method (that is, on a non-2xx response with `assert` on).
+ * `HttpError.cause` is typed `unknown`, so cast to this to read it:
+ *
+ * ```ts
+ * const ctx = err.cause as HttpErrorCause;
+ * console.error(`${ctx.method} ${ctx.url} → ${ctx.response.status}`);
+ * ```
+ *
+ * Note this is NOT the `cause` of a `NetworkError` — a transport failure never
+ * produced a response, and carries the underlying transport error as its cause
+ * instead (its URL is already embedded in the message).
+ */
+export interface HttpErrorCause {
+	/** The request method. */
+	method: string;
+	/**
+	 * The requested path as passed to the {@link HttpApi} method, resolved against
+	 * the instance `base`. Does NOT include the query string — prefer {@link url}.
+	 * Kept for backwards compatibility.
+	 */
+	path: string;
+	/**
+	 * The fully resolved request URL — base, path, query string, and (where the
+	 * runtime reports it) the post-redirect location. This is the value to log.
+	 */
+	url: string;
+	/** Response metadata. The body is on the error's own `body` property. */
+	response: {
+		status: number;
+		statusText: string;
+		headers: ResponseHeaders;
+	};
+}
+
+/**
+ * Renders the text appended (in parentheses) to an HTTP error message when
+ * {@link HttpApiGlobalOptions.appendUrlToErrorMessage} is set to a function.
+ * The package supplies the framing — return the URL text only.
+ *
+ * Return an empty string (or `null`/`undefined`) to skip the append entirely for
+ * this error — handy for redacting, or for decorating only some statuses.
+ *
+ * @example
+ * ```ts
+ * // strip the query string, which may carry credentials
+ * createHttpApi.global.appendUrlToErrorMessage = ({ method, url }) =>
+ *   `${method} ${url.split("?")[0]}`;
+ *
+ * // only decorate server errors
+ * createHttpApi.global.appendUrlToErrorMessage = ({ method, url, status }) =>
+ *   status >= 500 ? `${method} ${url}` : "";
+ * ```
+ */
+export type ErrorUrlFormatter = (info: {
+	/** The fully resolved request URL (same value as `cause.url`). */
+	url: string;
+	/** The request method. */
+	method: string;
+	/** The requested path resolved against `base`, without the query string. */
+	path: string;
+	/** The response status code. */
+	status: number;
+}) => string | null | undefined;
+
+/**
+ * Global options for {@link createHttpApi}, exposed as `createHttpApi.global`.
+ * Mirrors the `fetchOrThrow.global` pattern.
+ */
+export interface HttpApiGlobalOptions {
+	/**
+	 * Appends the resolved request URL to the `message` of every HTTP error thrown
+	 * by an {@link HttpApi} method. `true` uses the built-in rendering,
+	 * `"<message> (GET <url>)"`; a function ({@link ErrorUrlFormatter}) renders the
+	 * parenthesized part itself, so you can redact or decorate conditionally.
+	 *
+	 * Off by default: thrown messages are outward-facing (consumers render them,
+	 * match on them in tests, and route on them), so the shape must not change
+	 * for everyone. Turn it on at the app entry point when the shipped log line
+	 * is the only diagnostic artifact you get.
+	 *
+	 * Applied AFTER extraction, so it decorates whichever extractor won
+	 * (per-call, factory, global or built-in) and cannot be bypassed by any of
+	 * them. The URL is never truncated — the built-in extractor's 255-char cap
+	 * applies to the server's message only, since half a URL is worthless.
+	 *
+	 * Transport failures are unaffected: a `NetworkError` message already embeds
+	 * the URL, and is not decorated a second time.
+	 *
+	 * **Note:** with `true` the URL is appended verbatim, query string included.
+	 * If your URLs carry secrets (an API key or token as a query parameter, or an
+	 * id you treat as sensitive), that puts them wherever those messages end up —
+	 * logs, error reporters, possibly UI. Pass a function to redact. A formatter
+	 * that throws appends nothing (it does NOT fall back to the raw URL — failing
+	 * closed is the only safe direction for something whose job may be redaction).
+	 */
+	appendUrlToErrorMessage?: boolean | ErrorUrlFormatter;
+}
+
+// `Symbol.for` + `globalThis` so multiple bundled copies of this package still
+// share one config object (same approach as `fetchOrThrow.global` above).
+const _HTTPAPI_GLOBAL_KEY = Symbol.for("@marianmeres/http-utils/createHttpApi");
+const _HTTPAPI_GLOBAL: HttpApiGlobalOptions =
+	// deno-lint-ignore no-explicit-any
+	((globalThis as any)[_HTTPAPI_GLOBAL_KEY] ??= {
+		appendUrlToErrorMessage: false,
+	});
+
 const _fetch = async (
 	params: BaseFetchParams,
 	respHeaders: ResponseHeaders | null = null,
@@ -741,19 +850,52 @@ const _fetch = async (
 			return msg;
 		};
 
-		const msg = tryExtract(errorMessageExtractor) ??
+		let msg = tryExtract(errorMessageExtractor) ??
 			tryExtract(createHttpApi.defaultErrorMessageExtractor) ??
 			builtIn(body, r);
 
-		throw createHttpError(r.status, msg, body, {
+		// `r.url` is the runtime-resolved final URL (correct through redirects),
+		// but it is empty for a synthetic Response — e.g. one returned by a
+		// response interceptor — so fall back to the URL we actually requested.
+		const resolvedUrl = r.url || url;
+
+		// Decorate AFTER extraction so no extractor can bypass it. Appended whole:
+		// the 255-char cap in `builtIn` shortens the server message, not the URL.
+		const append = _HTTPAPI_GLOBAL.appendUrlToErrorMessage;
+		if (append) {
+			let suffix: string | null = null;
+			if (typeof append === "function") {
+				try {
+					const out = append({
+						url: resolvedUrl,
+						method: params.method,
+						path: params.path,
+						status: r.status,
+					});
+					if (typeof out === "string" && out !== "") suffix = out;
+				} catch (_e) {
+					// Deliberately NO fallback to the raw URL: a formatter is the
+					// place redaction lives, so a broken one must fail closed
+					// rather than leak what it was there to strip.
+				}
+			} else {
+				suffix = `${params.method} ${resolvedUrl}`;
+			}
+			if (suffix) msg = `${msg} (${suffix})`;
+		}
+
+		const cause: HttpErrorCause = {
 			method: params.method,
 			path: params.path,
+			url: resolvedUrl,
 			response: {
 				status: r.status,
 				statusText: r.statusText,
 				headers,
 			},
-		});
+		};
+
+		throw createHttpError(r.status, msg, body, cause);
 	}
 
 	return body;
@@ -1112,6 +1254,14 @@ export function createHttpApi(
  * A throwing extractor will not crash the call — the next priority level is
  * used as a fallback.
  *
+ * Its contract is "what did the server say", so do NOT use it to fold in request
+ * context: it is bypassed by any per-request or per-instance extractor, and it
+ * replaces the built-in body-shape digging instead of decorating it. To get the
+ * request URL into error messages, use
+ * {@link HttpApiGlobalOptions.appendUrlToErrorMessage} instead — it is applied
+ * after extraction and cannot be bypassed. The URL is also always available,
+ * message flag or not, on the error's `cause` (see {@link HttpErrorCause}).
+ *
  * @example
  * ```ts
  * createHttpApi.defaultErrorMessageExtractor = (body, response) => {
@@ -1123,3 +1273,17 @@ createHttpApi.defaultErrorMessageExtractor = null as
 	| ErrorMessageExtractor
 	| null
 	| undefined;
+
+/**
+ * Global options shared by every {@link HttpApi} instance (and by multiple bundled
+ * copies of this package). Mirrors `fetchOrThrow.global`.
+ *
+ * @example
+ * ```ts
+ * // once, at the app entry point — next to the fetchOrThrow hooks:
+ * fetchOrThrow.global.onError = ({ url, kind, reason }) => log.error(kind, url, reason);
+ * createHttpApi.global.appendUrlToErrorMessage = true;
+ * // a 502 now throws: "Bot backend unavailable (GET https://api.example.com/v2/bot?id=7)"
+ * ```
+ */
+createHttpApi.global = _HTTPAPI_GLOBAL;

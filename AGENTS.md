@@ -38,7 +38,25 @@ function createHttpApi(
 	defaults?: Partial<FetchParams> | (() => Promise<Partial<FetchParams>>),
 	factoryErrorMessageExtractor?: ErrorMessageExtractor | null,
 ): HttpApi;
+
+// Static properties (global, shared via Symbol.for + globalThis across bundled copies):
+createHttpApi.defaultErrorMessageExtractor; // ErrorMessageExtractor | null — "what did the server say"; bypassed by per-request/per-instance extractors
+createHttpApi.global; // HttpApiGlobalOptions
+createHttpApi.global.appendUrlToErrorMessage; // boolean | ErrorUrlFormatter, default false
 ```
+
+`appendUrlToErrorMessage` appends `" (<METHOD> <resolved url>)"` to the message of every
+HTTP error thrown by an `HttpApi` method. Applied AFTER extraction, so it decorates
+whichever extractor won and cannot be bypassed; the URL is never truncated (the built-in
+255-char cap applies to the server message only); `NetworkError` is untouched (its message
+already embeds the URL). Off by default — thrown messages are outward-facing. Mirrors the
+`fetchOrThrow.global` pattern. Do NOT use `defaultErrorMessageExtractor` for this job.
+
+Set it to an `ErrorUrlFormatter` instead of `true` to render the appended text yourself
+(redaction, conditional decoration). A formatter that returns a blank/non-string, or that
+throws, appends nothing — it deliberately does NOT fall back to the raw URL, so a broken
+redactor fails closed. The message is the only thing affected; `cause.url` is always the
+unredacted URL.
 
 ### HttpApi Methods
 
@@ -107,6 +125,19 @@ interface DataOptions {
 type ErrorMessageExtractor = (body: unknown, response: Response) => string;
 type ResponseHeaders = Record<string, string | number>;
 
+interface HttpApiGlobalOptions {
+	appendUrlToErrorMessage?: boolean | ErrorUrlFormatter;
+}
+
+// Renders the parenthesized text appended to an HTTP error message. Return the URL text
+// only (the package supplies the framing). Empty string / null / undefined => no append.
+type ErrorUrlFormatter = (info: {
+	url: string; // fully resolved (same as cause.url)
+	method: string;
+	path: string; // resolved against base, no query string
+	status: number;
+}) => string | null | undefined;
+
 type RequestInterceptor = (
 	init: RequestInit,
 	ctx: { method: string; url: string },
@@ -140,6 +171,22 @@ HTTP_ERROR.BadGateway; // 502
 HTTP_ERROR.ServiceUnavailable; // 503
 HTTP_ERROR.NetworkError; // 0 (transport-level failure: DNS/refused/timeout/unreachable; extends HttpError, cause = underlying error)
 ```
+
+Every HTTP error thrown by an `HttpApi` method (non-2xx) carries request context as
+`cause` (exported as `HttpErrorCause`):
+
+```typescript
+interface HttpErrorCause {
+	method: string;
+	path: string; // resolved against base, NO query string — legacy, prefer `url`
+	url: string; // base + path + query, post-redirect; falls back to the requested URL
+	//              when a response interceptor returned a synthetic Response (`r.url` is "")
+	response: { status: number; statusText: string; headers: ResponseHeaders };
+}
+```
+
+Not applicable to `NetworkError` — no response was received, so its `cause` is the
+underlying transport error.
 
 ### Helper Functions
 
@@ -218,6 +265,10 @@ class HTTP_STATUS {
 11. **Request tracing**: `fetchOrThrow.global.onRequest` / `onError` are observer-only
     hooks (no recovery/transform), overridable per call (`per-call ?? global`). They also
     fire for `HttpApi` requests, since the client routes through `fetchOrThrow`.
+12. **Error request context**: HTTP errors carry `cause.url` (fully resolved, query
+    included) — `cause.path` predates it and omits the query. Transport failures already
+    name the URL in the message; HTTP errors do not (the message is the server's own), so
+    `createHttpApi.global.appendUrlToErrorMessage` opts into appending it there too.
 
 ## Request Body Serialization
 

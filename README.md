@@ -161,6 +161,67 @@ try {
 }
 ```
 
+### Diagnosing Failures in Production
+
+The two failure modes carry request context differently, which is worth knowing before you
+go looking for a URL that isn't there:
+
+| Failure                             | Thrown         | URL in `.message`?         |
+| ----------------------------------- | -------------- | -------------------------- |
+| Transport (DNS, ECONNREFUSED, CORS) | `NetworkError` | yes, always                |
+| HTTP non-2xx (404, 502, …)          | `HTTP_ERROR.*` | no — it's the server's own |
+
+A transport failure never reached a server, so `fetchOrThrow` builds the message itself
+and puts the URL in it. A non-2xx _did_ reach one, so the message is whatever the server
+said — `"Bot backend unavailable"` and nothing more.
+
+The URL is always on the error's `cause` (fully resolved: base + path + query, and
+post-redirect where the runtime reports it):
+
+```ts
+import type { HttpErrorCause } from "@marianmeres/http-utils";
+
+try {
+	await api.get("/resource");
+} catch (error) {
+	// status > 0 excludes NetworkError, whose cause is the transport error instead
+	if (error instanceof HTTP_ERROR.HttpError && error.status > 0) {
+		const { method, url } = error.cause as HttpErrorCause;
+		log.error(`${method} ${url} → ${error.status}: ${error.message}`);
+	}
+}
+```
+
+If the shipped log line is the only artifact you get — you log `error.message` and nothing
+else — opt in to having the URL appended to the message itself:
+
+```ts
+// once, at the app entry point
+createHttpApi.global.appendUrlToErrorMessage = true;
+// a 502 now throws: "Bot backend unavailable (GET https://api.example.com/v2/bot?id=7)"
+```
+
+Off by default, because thrown messages are outward-facing (rendered in UI, matched on in
+tests). It is applied _after_ extraction, so it decorates whichever error extractor won
+and cannot be bypassed by a per-request or per-instance one, and `NetworkError` messages
+are left alone (they already carry the URL).
+
+`true` appends the URL verbatim, query string included. If yours carry credentials, pass a
+formatter instead — it renders the parenthesized part, and returning an empty string skips
+the append altogether:
+
+```ts
+// redact the query string
+createHttpApi.global.appendUrlToErrorMessage = ({ method, url }) =>
+	`${method} ${url.split("?")[0]}`;
+
+// or decorate only server errors
+createHttpApi.global.appendUrlToErrorMessage = ({ method, url, status }) =>
+	status >= 500 ? `${method} ${url}` : "";
+```
+
+This affects the message only — `cause.url` always carries the unredacted URL.
+
 ### Key Features
 
 - **Auto JSON**: Response bodies are automatically parsed as JSON; empty bodies (204/205)
@@ -177,6 +238,9 @@ try {
 - **AbortController**: Pass `signal` for request cancellation (composes with `timeout`)
 - **Interceptors**: `api.onRequest(...)` / `api.onResponse(...)` for tracing, auth
   refresh, etc.
+- **Diagnosable errors**: every HTTP error carries the fully resolved request URL on its
+  `cause`; opt in to `createHttpApi.global.appendUrlToErrorMessage` to get it in `message`
+  too
 - **Typed responses**: Use generics for type-safe responses: `api.get<User>("/users/1")`
 
 ### Query, Timeout, Interceptors

@@ -82,6 +82,74 @@ createHttpApi.defaultErrorMessageExtractor = (body, response) => {
 
 Priority order: per-request > per-instance > global > built-in fallback.
 
+Its contract is _"what did the server say"_. Do not use it to fold in request context: it
+is bypassed by any per-request or per-instance extractor, and it replaces the built-in
+body-shape digging rather than decorating it. Use
+[`createHttpApi.global.appendUrlToErrorMessage`](#createhttpapiglobal) for that.
+
+#### `createHttpApi.global`
+
+Global options shared by every `HttpApi` instance — and, via `Symbol.for` + `globalThis`,
+by multiple bundled copies of this package. Mirrors
+[`fetchOrThrow.global`](#fetchorthrow).
+
+```ts
+interface HttpApiGlobalOptions {
+	appendUrlToErrorMessage?: boolean | ErrorUrlFormatter; // default: false
+}
+
+type ErrorUrlFormatter = (info: {
+	url: string; // fully resolved request URL (same value as `cause.url`)
+	method: string;
+	path: string; // resolved against `base`, without the query string
+	status: number;
+}) => string | null | undefined;
+```
+
+**`appendUrlToErrorMessage`** — appends the resolved request URL to the `message` of every
+HTTP error thrown by an `HttpApi` method. `true` uses the built-in rendering:
+
+```ts
+createHttpApi.global.appendUrlToErrorMessage = true;
+// a 502 now throws: "Bot backend unavailable (GET https://api.example.com/v2/bot?id=7)"
+```
+
+Off by default: thrown messages are outward-facing (rendered in UI, matched on in tests),
+so the shape must not change for everyone. Turn it on at the app entry point when the
+shipped log line is the only diagnostic artifact you get.
+
+- Applied **after** extraction, so it decorates whichever extractor won (per-request,
+  per-instance, global or built-in) and cannot be bypassed by any of them.
+- The URL is never truncated — the built-in extractor's 255-char cap applies to the
+  server's message only.
+- `NetworkError` messages are left alone: they already embed the URL.
+
+The URL is available on the error's [`cause`](#httperror-base-class) whether or not this
+flag is on.
+
+**Passing a formatter.** With `true`, the URL is appended verbatim, query string included
+— if your URLs carry credentials, they land wherever those messages do. Pass an
+`ErrorUrlFormatter` to render the parenthesized part yourself; the package supplies the
+framing, so return the URL text only:
+
+```ts
+// redact the query string
+createHttpApi.global.appendUrlToErrorMessage = ({ method, url }) =>
+	`${method} ${url.split("?")[0]}`;
+
+// or decorate only server errors
+createHttpApi.global.appendUrlToErrorMessage = ({ method, url, status }) =>
+	status >= 500 ? `${method} ${url}` : "";
+```
+
+Returning an empty string (or `null`/`undefined`) skips the append entirely for that
+error. A formatter that **throws** also appends nothing — it deliberately does _not_ fall
+back to the raw URL, since failing closed is the only safe direction for something whose
+job may be redaction.
+
+Note this affects the message only. `cause.url` always carries the unredacted URL — it is
+structured context, not a string that gets rendered.
+
 ---
 
 ## opts
@@ -554,9 +622,45 @@ class HttpError extends Error {
 	status: number; // HTTP status code
 	statusText: string; // HTTP status text
 	body: unknown; // Response body (auto-parsed as JSON)
-	cause: unknown; // Error cause/details
+	cause: unknown; // Error cause/details — see HttpErrorCause below
 }
 ```
+
+#### `HttpErrorCause`
+
+Errors thrown by an `HttpApi` method on a non-2xx response carry the request context as
+`cause`. `cause` is typed `unknown` (it is the standard `Error` property), so cast to this
+exported type to read it:
+
+```ts
+interface HttpErrorCause {
+	method: string; // request method
+	path: string; // requested path resolved against `base` — NO query string
+	url: string; // fully resolved URL: base + path + query, post-redirect
+	response: {
+		status: number;
+		statusText: string;
+		headers: ResponseHeaders;
+	};
+}
+```
+
+```ts
+import type { HttpErrorCause } from "@marianmeres/http-utils";
+
+const { method, url } = error.cause as HttpErrorCause;
+log.error(`${method} ${url} → ${error.status}: ${error.message}`);
+```
+
+`url` is the value to log — `path` is the pre-query value and is kept only for backwards
+compatibility. Where the runtime reports a resolved URL (it does for a real `fetch`),
+`url` is post-redirect; for a synthetic `Response` returned by an
+[`onResponse` interceptor](#onresponseinterceptor) it falls back to the URL that was
+requested.
+
+Note this does **not** apply to `NetworkError`: no response was ever received, so its
+`cause` is the underlying transport error instead (and its message already carries the
+URL).
 
 ### Client Errors (4xx)
 
