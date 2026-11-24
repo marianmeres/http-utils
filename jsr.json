@@ -1,0 +1,24 @@
+{
+  "name": "@marianmeres/http-utils",
+  "exports": "./src/mod.ts",
+  "compilerOptions": {
+    "lib": [
+      "deno.window"
+    ]
+  },
+  "publish": {
+    "include": [
+      "src/**/*.ts",
+      "tests/**/*.ts",
+      "README.md",
+      "API.md",
+      "AGENTS.md",
+      "CLAUDE.md",
+      "LICENSE",
+      ".editorconfig"
+    ],
+    "exclude": [
+      "tests/consumer"
+    ]
+  }
+}

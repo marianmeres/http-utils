@@ -1,0 +1,70 @@
+{
+  "name": "@marianmeres/http-utils",
+  "version": "2.12.0",
+  "description": "Lightweight HTTP client wrapper for native fetch: type-safe error classes mapped to HTTP status codes (404 → NotFound, 401 → Unauthorized, …), auto JSON parsing, Bearer tokens, base URLs, timeouts, interceptors and transport errors that name the host and the real reason.",
+  "license": "MIT",
+  "author": "Marian Meres",
+  "type": "module",
+  "packageManager": "pnpm@12.18.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "./dist/mod.js",
+  "types": "./dist/mod.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/mod.d.ts",
+      "import": "./dist/mod.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md",
+    "API.md",
+    "AGENTS.md",
+    "CLAUDE.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/marianmeres/http-utils.git"
+  },
+  "bugs": {
+    "url": "https://github.com/marianmeres/http-utils/issues"
+  },
+  "homepage": "https://github.com/marianmeres/http-utils#readme",
+  "keywords": [
+    "http",
+    "fetch",
+    "http-client",
+    "api-client",
+    "http-error",
+    "http-status",
+    "rest",
+    "json"
+  ],
+  "scripts": {
+    "build": "pnpm run clean && tsc -p tsconfig.build.json",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "typecheck:consumer": "pnpm run build && tsc -p tests/consumer/tsconfig.json",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "test": "node --test \"tests/**/*.test.ts\"",
+    "test:watch": "node --test --watch \"tests/**/*.test.ts\"",
+    "test:deno": "deno test --allow-net --no-lock --config jsr.json tests/",
+    "jsr:check": "deno publish --dry-run --allow-dirty --set-version \"$npm_package_version\"",
+    "ci": "pnpm run typecheck && pnpm run lint && pnpm test && pnpm run typecheck:consumer",
+    "prepublishOnly": "pnpm run ci && pnpm run build",
+    "release": "npx --yes @marianmeres/release@^2.3.0 --before-bump \"pnpm run ci\"",
+    "publish:jsr": "pnpm run test:deno && deno publish --set-version \"$npm_package_version\"",
+    "publish:all": "pnpm publish && pnpm run publish:jsr",
+    "rp": "npm whoami >/dev/null && pnpm run release -y --before-push \"pnpm run publish:all\"",
+    "rpm": "npm whoami >/dev/null && pnpm run release minor -y --before-push \"pnpm run publish:all\""
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.8",
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2"
+  }
+}

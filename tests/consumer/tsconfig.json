@@ -1,0 +1,17 @@
+{
+	// `pnpm run typecheck:consumer`: type-checks tests/consumer/index.ts against the BUILT
+	// package (`dist/`, resolved by its own name through "exports"), the way a downstream
+	// project sees it: strict, a plain browser lib, no @types/node, skipLibCheck off, so
+	// every published .d.ts is checked.
+	"compilerOptions": {
+		"target": "es2022",
+		"lib": ["es2022", "dom"],
+		"module": "nodenext",
+		"moduleResolution": "nodenext",
+		"types": [],
+		"strict": true,
+		"skipLibCheck": false,
+		"noEmit": true
+	},
+	"files": ["index.ts"]
+}

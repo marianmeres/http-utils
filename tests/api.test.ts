@@ -194,9 +194,7 @@ test("custom local error message extractor", async () => {
 			undefined,
 			undefined,
 			(body: unknown, _resp: Response) => {
-				return (
-					body as Record<string, Record<string, string>>
-				).error.message.toUpperCase();
+				return (body as ErrorBody).error.message.toUpperCase();
 			},
 		);
 		assert.ok(false); // must not be reached
@@ -213,9 +211,7 @@ test("custom factory error message extractor", async () => {
 		undefined,
 		undefined,
 		(body: unknown, _resp: Response) => {
-			return (
-				body as Record<string, Record<string, string>>
-			).error.message.toUpperCase();
+			return (body as ErrorBody).error.message.toUpperCase();
 		},
 	);
 
@@ -235,9 +231,7 @@ test("custom global error message extractor", async () => {
 		body: unknown,
 		_resp: Response,
 	) => {
-		return (
-			body as Record<string, Record<string, string>>
-		).error.message.toUpperCase();
+		return (body as ErrorBody).error.message.toUpperCase();
 	};
 
 	const api = createHttpApi();

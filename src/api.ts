@@ -640,7 +640,7 @@ export async function fetchOrThrow(
  * fetchOrThrow.global.onRequest = ({ method, url }) => console.debug(`→ ${method} ${url}`);
  * ```
  */
-fetchOrThrow.global = _FOT_GLOBAL;
+fetchOrThrow.global = _FOT_GLOBAL as FetchOrThrowGlobalOptions;
 
 /**
  * Request context attached as `cause` to every HTTP error thrown by an
@@ -1286,4 +1286,4 @@ createHttpApi.defaultErrorMessageExtractor = null as
  * // a 502 now throws: "Bot backend unavailable (GET https://api.example.com/v2/bot?id=7)"
  * ```
  */
-createHttpApi.global = _HTTPAPI_GLOBAL;
+createHttpApi.global = _HTTPAPI_GLOBAL as HttpApiGlobalOptions;

@@ -16,18 +16,20 @@ convenient defaults.
   global)
 - 🛰️ **No swallowed transport errors** - DNS/connection failures surface the host and real
   reason instead of an opaque "fetch failed"
-- 📦 **Deno & Node.js** - Works in both runtimes
+- 📦 **Universal** - Web standards only: browsers, Node and any modern runtime
 - 🦾 **Generic return types** - Optional type parameters for typed responses
 
 ## Installation
 
 ```shell
-deno add jsr:@marianmeres/http-utils
+npm install @marianmeres/http-utils
 ```
 
 ```shell
-npm install @marianmeres/http-utils
+deno add jsr:@marianmeres/http-utils
 ```
+
+Plain ESM with type declarations, zero dependencies.
 
 ```ts
 import { createHttpApi, HTTP_ERROR, opts } from "@marianmeres/http-utils";
@@ -337,3 +339,22 @@ import { createHttpError } from "@marianmeres/http-utils";
 const error = createHttpError(404, "User not found", { userId: 123 });
 throw error; // instanceof NotFound
 ```
+
+## Development
+
+Node LTS (`.node-version`), pnpm, Biome, `node:test`. The source is erasable-only
+TypeScript that Node runs directly; `dist/` is built only for publishing to npm. JSR is
+served the `.ts` source (`jsr.json`).
+
+| Command | Does |
+| --- | --- |
+| `pnpm install` | installs the dev tooling |
+| `pnpm test` / `pnpm run test:watch` | `node --test` over `tests/**/*.test.ts` |
+| `pnpm run test:deno` | the same suite on Deno, as JSR consumers run it |
+| `pnpm run typecheck` | `tsc --noEmit` over `src` and `tests` |
+| `pnpm run typecheck:consumer` | builds `dist/` and type-checks it the way a downstream project sees it |
+| `pnpm run lint` / `pnpm run format` | `biome check .` read-only / with `--write` |
+| `pnpm run ci` | typecheck + lint + test + consumer typecheck, what CI runs |
+| `pnpm run build` | `tsc -p tsconfig.build.json` → `dist/` |
+| `pnpm run jsr:check` | `deno publish --dry-run`: the JSR file set and Deno's type check |
+| `pnpm run rp` / `pnpm run rpm` | patch / minor release: npm, then JSR |

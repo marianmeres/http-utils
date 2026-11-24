@@ -4,9 +4,9 @@
 
 ```yaml
 name: "@marianmeres/http-utils"
-version: "2.8.0"
+version: "2.12.0"
 license: MIT
-runtime: deno, node
+runtime: universal (web standards only; browsers, Node, any modern runtime)
 type: library
 category: http-client
 ```
@@ -284,27 +284,68 @@ User-provided `Content-Type` header is always preserved.
 ## Development Commands
 
 ```bash
-deno task test        # Run tests
-deno task test:watch  # Run tests in watch mode
-deno task npm:build   # Build for NPM
-deno task publish     # Publish to JSR and NPM
+pnpm install                  # dev tooling (Node LTS from .node-version, pnpm)
+pnpm test                     # node --test over tests/**/*.test.ts
+pnpm run test:watch           # same, watch mode
+pnpm run test:deno            # the same suite on Deno, via jsr.json (as JSR consumers run it)
+pnpm run typecheck            # tsc --noEmit over src + tests (Node never checks types)
+pnpm run typecheck:consumer   # build dist/, type-check it as a downstream project
+pnpm run lint                 # biome check . (read-only)
+pnpm run format               # biome check --write .
+pnpm run ci                   # typecheck + lint + test + typecheck:consumer (what CI runs)
+pnpm run build                # tsc -p tsconfig.build.json -> dist/
+pnpm run jsr:check            # deno publish --dry-run: JSR file set + Deno's type check
+pnpm run rp / pnpm run rpm    # patch / minor release (human only): ci, bump, tag, npm + JSR, push
 ```
+
+## Tooling Conventions
+
+1. **Runtime policy** — Node at the keyboard, npm as the registry. No `Deno.*`, `Bun.*`,
+   `jsr:` or `npm:` specifiers in source; web standards only (the package ships to
+   browsers). Nothing is built or tested for Bun. Deno exists only for JSR: `test:deno`
+   runs the same suite against `jsr.json`, and `publish:jsr` runs it first.
+2. **Erasable TypeScript** — no `enum`, `namespace`, constructor parameter properties;
+   `import type` for types; explicit `.ts` import extensions (rewritten to `.js` on
+   emit). `pnpm run typecheck` is the only type gate for `src` + `tests`.
+3. **Manifests** — `package.json` is the manifest of record and holds the version; npm
+   gets `dist/` (gitignored, built by `tsc`). `jsr.json` (no version; `publish:jsr`
+   passes `--set-version`) gives JSR the `.ts` source, the tests and the docs.
+4. **Expando declarations** — `fetchOrThrow.global` and `createHttpApi.global` are
+   assigned `as FetchOrThrowGlobalOptions` / `as HttpApiGlobalOptions` in `src/api.ts`.
+   The casts are type-only (erased from the JS) and not redundant: without them tsc 7
+   emits the namespace so that `createHttpApi.defaultErrorMessageExtractor` is missing
+   from the published `.d.ts`. `tests/consumer/` (`typecheck:consumer`, part of `ci`)
+   checks the built package as a consumer and fails if it regresses.
+5. **Formatting and lint** — Biome (`biome.json`): tabs, 4 wide, 90 columns, double
+   quotes; manifests at 2 spaces. `pnpm run format` before committing. Two recommended
+   rules are warnings on purpose: `noDoubleEquals` (`HTTP_STATUS.findByCode` compares with
+   `==` so `"404"` matches 404; its fix is disabled) and `noAssignInExpressions` (the
+   `??=` global singletons).
+6. **Tests** — `node:test` + `node:assert/strict`. Mock servers use `serve()` from
+   `tests/_helpers.ts` (`Request => Response` handlers over `node:http`, port 0).
+   Global state (`fetchOrThrow.global`, `createHttpApi.global`,
+   `defaultErrorMessageExtractor`) is per process: reset it in `afterEach` or `finally`.
 
 ## Dependencies
 
 - **Runtime**: None (zero dependencies)
-- **Dev**: @std/assert (testing)
+- **Dev**: TypeScript, Biome, `@types/node` (testing uses `node:test` and `node:assert`)
 
 ## File Locations
 
-| Purpose                | Path              |
-| ---------------------- | ----------------- |
-| Entry point            | `src/mod.ts`      |
-| HttpApi implementation | `src/api.ts`      |
-| Error classes          | `src/error.ts`    |
-| Status codes           | `src/status.ts`   |
-| Tests                  | `tests/*.test.ts` |
-| NPM output             | `.npm-dist/`      |
+| Purpose                       | Path                                          |
+| ----------------------------- | --------------------------------------------- |
+| Entry point                   | `src/mod.ts`                                  |
+| HttpApi implementation        | `src/api.ts`                                  |
+| Error classes                 | `src/error.ts`                                |
+| Status codes                  | `src/status.ts`                               |
+| Tests                         | `tests/*.test.ts`, helpers `tests/_helpers.ts` |
+| Consumer type check           | `tests/consumer/`                             |
+| npm output (gitignored)       | `dist/`                                       |
+| Manifest of record            | `package.json`                                |
+| JSR config (no version)       | `jsr.json`                                    |
+| Type gate / build             | `tsconfig.json` / `tsconfig.build.json`       |
+| Format + lint                 | `biome.json`                                  |
 
 ## Common Patterns
 
