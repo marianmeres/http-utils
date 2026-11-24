@@ -78,7 +78,7 @@ test("cause.url is present and fully resolved on a non-2xx throw", async () => {
 test("cause.url includes the query string (cause.path does not)", async () => {
 	const api = createHttpApi(url);
 	const e = await catchHttpError(() =>
-		api.get("/fail", { query: { educationId: "abc", tag: ["x", "y"] } })
+		api.get("/fail", { query: { educationId: "abc", tag: ["x", "y"] } }),
 	);
 
 	const cause = e.cause as HttpErrorCause;
@@ -100,11 +100,12 @@ test("cause.url reflects the post-redirect URL", async () => {
 test("cause.url falls back to the requested URL for a synthetic response", async () => {
 	// A response interceptor may return a `new Response(...)`, whose `.url` is
 	// always "". The requested URL must be used instead of an empty string.
-	const api = createHttpApi(url).onResponse(() =>
-		new Response('{"error":{"message":"replaced"}}', {
-			status: 503,
-			headers: { "Content-Type": "application/json" },
-		})
+	const api = createHttpApi(url).onResponse(
+		() =>
+			new Response('{"error":{"message":"replaced"}}', {
+				status: 503,
+				headers: { "Content-Type": "application/json" },
+			}),
 	);
 	const e = await catchHttpError(() => api.get("/fail", { query: { a: 1 } }));
 
@@ -135,7 +136,7 @@ test("appendUrlToErrorMessage decorates a per-call extractor", async () => {
 	createHttpApi.global.appendUrlToErrorMessage = true;
 	const api = createHttpApi(url);
 	const e = await catchHttpError(() =>
-		api.get("/fail", undefined, null, () => "per-call")
+		api.get("/fail", undefined, null, () => "per-call"),
 	);
 
 	assert.deepStrictEqual(e.message, `per-call (GET ${url}/fail)`);
@@ -200,7 +201,7 @@ test("appendUrlToErrorMessage formatter renders the appended text", async () => 
 		`${method} ${url.split("?")[0]}`; // redact the query string
 	const api = createHttpApi(url);
 	const e = await catchHttpError(() =>
-		api.get("/fail", { query: { token: "s3cret" } })
+		api.get("/fail", { query: { token: "s3cret" } }),
 	);
 
 	assert.deepStrictEqual(e.message, `${ERR_MSG} (GET ${url}/fail)`);
@@ -256,7 +257,7 @@ test("appendUrlToErrorMessage: a throwing formatter fails closed (no raw URL)", 
 	};
 	const api = createHttpApi(url);
 	const e = await catchHttpError(() =>
-		api.get("/fail", { query: { token: "s3cret" } })
+		api.get("/fail", { query: { token: "s3cret" } }),
 	);
 
 	// The real HTTP error survives untouched...
@@ -270,7 +271,7 @@ test("appendUrlToErrorMessage formatter decorates a per-call extractor too", asy
 	createHttpApi.global.appendUrlToErrorMessage = ({ url }) => `at ${url}`;
 	const api = createHttpApi(url);
 	const e = await catchHttpError(() =>
-		api.get("/fail", undefined, null, () => "per-call")
+		api.get("/fail", undefined, null, () => "per-call"),
 	);
 
 	assert.deepStrictEqual(e.message, `per-call (at ${url}/fail)`);

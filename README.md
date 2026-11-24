@@ -346,15 +346,15 @@ Node LTS (`.node-version`), pnpm, Biome, `node:test`. The source is erasable-onl
 TypeScript that Node runs directly; `dist/` is built only for publishing to npm. JSR is
 served the `.ts` source (`jsr.json`).
 
-| Command | Does |
-| --- | --- |
-| `pnpm install` | installs the dev tooling |
-| `pnpm test` / `pnpm run test:watch` | `node --test` over `tests/**/*.test.ts` |
-| `pnpm run test:deno` | the same suite on Deno, as JSR consumers run it |
-| `pnpm run typecheck` | `tsc --noEmit` over `src` and `tests` |
-| `pnpm run typecheck:consumer` | builds `dist/` and type-checks it the way a downstream project sees it |
-| `pnpm run lint` / `pnpm run format` | `biome check .` read-only / with `--write` |
-| `pnpm run ci` | typecheck + lint + test + consumer typecheck, what CI runs |
-| `pnpm run build` | `tsc -p tsconfig.build.json` → `dist/` |
-| `pnpm run jsr:check` | `deno publish --dry-run`: the JSR file set and Deno's type check |
-| `pnpm run rp` / `pnpm run rpm` | patch / minor release: npm, then JSR |
+| Command                             | Does                                                                   |
+| ----------------------------------- | ---------------------------------------------------------------------- |
+| `pnpm install`                      | installs the dev tooling                                               |
+| `pnpm test` / `pnpm run test:watch` | `node --test` over `tests/**/*.test.ts`                                |
+| `pnpm run test:deno`                | the same suite on Deno, as JSR consumers run it                        |
+| `pnpm run typecheck`                | `tsc --noEmit` over `src` and `tests`                                  |
+| `pnpm run typecheck:consumer`       | builds `dist/` and type-checks it the way a downstream project sees it |
+| `pnpm run lint` / `pnpm run format` | `biome check .` read-only / with `--write`                             |
+| `pnpm run ci`                       | typecheck + lint + test + consumer typecheck, what CI runs             |
+| `pnpm run build`                    | `tsc -p tsconfig.build.json` → `dist/`                                 |
+| `pnpm run jsr:check`                | `deno publish --dry-run`: the JSR file set and Deno's type check       |
+| `pnpm run rp` / `pnpm run rpm`      | patch / minor release: npm, then JSR                                   |

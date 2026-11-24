@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { HTTP_STATUS } from "../src/status.ts";
 import { createHttpError, getErrorMessage, HTTP_ERROR } from "../src/error.ts";
+import { HTTP_STATUS } from "../src/status.ts";
 
 test("HTTP_STATUS.findByCode", () => {
 	const s = HTTP_STATUS.findByCode(200);

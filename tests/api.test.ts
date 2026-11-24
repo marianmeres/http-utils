@@ -68,10 +68,7 @@ test("createHttpApi GET", async () => {
 	const api = createHttpApi();
 	const respHeaders: Record<string, string | number> = {};
 
-	const r = (await api.get(`${url}/echo`, {}, respHeaders)) as Record<
-		string,
-		unknown
-	>;
+	const r = (await api.get(`${url}/echo`, {}, respHeaders)) as Record<string, unknown>;
 	assert.deepStrictEqual(r.foo, "bar");
 	assert.deepStrictEqual(respHeaders.__http_status_code__, 200);
 });
@@ -88,10 +85,7 @@ test("createHttpApi base option", async () => {
 	const api = createHttpApi(url);
 	const respHeaders: Record<string, string | number> = {};
 
-	const r = (await api.get("/echo", {}, respHeaders)) as Record<
-		string,
-		unknown
-	>;
+	const r = (await api.get("/echo", {}, respHeaders)) as Record<string, unknown>;
 	assert.deepStrictEqual(r.foo, "bar");
 	assert.deepStrictEqual(respHeaders.__http_status_code__, 200);
 	assert.deepStrictEqual(api.base, url);
@@ -176,11 +170,10 @@ test("createHttpApi error { assert: false } does not throw", async () => {
 	const api = createHttpApi();
 	const respHeaders: Record<string, string | number> = {};
 
-	const r = (await api.get(
-		`${url}/asdf`,
-		{ assert: false },
-		respHeaders,
-	)) as Record<string, unknown>;
+	const r = (await api.get(`${url}/asdf`, { assert: false }, respHeaders)) as Record<
+		string,
+		unknown
+	>;
 	assert.deepStrictEqual((r.error as Record<string, unknown>).message, CUSTOM_ERR_MSG);
 	assert.deepStrictEqual(respHeaders.__http_status_code__, 404);
 });
@@ -207,13 +200,9 @@ test("custom local error message extractor", async () => {
 });
 
 test("custom factory error message extractor", async () => {
-	const api = createHttpApi(
-		undefined,
-		undefined,
-		(body: unknown, _resp: Response) => {
-			return (body as ErrorBody).error.message.toUpperCase();
-		},
-	);
+	const api = createHttpApi(undefined, undefined, (body: unknown, _resp: Response) => {
+		return (body as ErrorBody).error.message.toUpperCase();
+	});
 
 	try {
 		await api.get(`${url}/asdf`);
@@ -227,10 +216,7 @@ test("custom factory error message extractor", async () => {
 });
 
 test("custom global error message extractor", async () => {
-	createHttpApi.defaultErrorMessageExtractor = (
-		body: unknown,
-		_resp: Response,
-	) => {
+	createHttpApi.defaultErrorMessageExtractor = (body: unknown, _resp: Response) => {
 		return (body as ErrorBody).error.message.toUpperCase();
 	};
 

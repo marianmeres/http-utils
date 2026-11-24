@@ -116,11 +116,9 @@ test("B2: user Content-Type is not overwritten for object data", async () => {
 // B3: String bodies are sent as-is, not JSON-stringified.
 test("B3: string data is sent raw, not JSON-stringified", async () => {
 	const api = createHttpApi(url);
-	const r = (await api.post(
-		"/echo",
-		"hello",
-		{ headers: { "content-type": "text/plain" } },
-	)) as EchoResponse;
+	const r = (await api.post("/echo", "hello", {
+		headers: { "content-type": "text/plain" },
+	})) as EchoResponse;
 	assert.deepStrictEqual(r.body, "hello");
 	assert.deepStrictEqual(r.contentType, "text/plain");
 });

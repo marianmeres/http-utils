@@ -333,19 +333,19 @@ pnpm run rp / pnpm run rpm    # patch / minor release (human only): ci, bump, ta
 
 ## File Locations
 
-| Purpose                       | Path                                          |
-| ----------------------------- | --------------------------------------------- |
-| Entry point                   | `src/mod.ts`                                  |
-| HttpApi implementation        | `src/api.ts`                                  |
-| Error classes                 | `src/error.ts`                                |
-| Status codes                  | `src/status.ts`                               |
-| Tests                         | `tests/*.test.ts`, helpers `tests/_helpers.ts` |
-| Consumer type check           | `tests/consumer/`                             |
-| npm output (gitignored)       | `dist/`                                       |
-| Manifest of record            | `package.json`                                |
-| JSR config (no version)       | `jsr.json`                                    |
-| Type gate / build             | `tsconfig.json` / `tsconfig.build.json`       |
-| Format + lint                 | `biome.json`                                  |
+| Purpose                 | Path                                           |
+| ----------------------- | ---------------------------------------------- |
+| Entry point             | `src/mod.ts`                                   |
+| HttpApi implementation  | `src/api.ts`                                   |
+| Error classes           | `src/error.ts`                                 |
+| Status codes            | `src/status.ts`                                |
+| Tests                   | `tests/*.test.ts`, helpers `tests/_helpers.ts` |
+| Consumer type check     | `tests/consumer/`                              |
+| npm output (gitignored) | `dist/`                                        |
+| Manifest of record      | `package.json`                                 |
+| JSR config (no version) | `jsr.json`                                     |
+| Type gate / build       | `tsconfig.json` / `tsconfig.build.json`        |
+| Format + lint           | `biome.json`                                   |
 
 ## Common Patterns
 

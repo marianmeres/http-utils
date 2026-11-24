@@ -180,14 +180,13 @@ export class HTTP_STATUS {
 		code: number | string,
 	): { CODE: number; TEXT: string; _TYPE: string; _KEY: string } | null {
 		type StatusEntry = { CODE: number; TEXT: string };
-		const keys:
-			("INFO" | "SUCCESS" | "REDIRECT" | "ERROR_CLIENT" | "ERROR_SERVER")[] = [
-				"INFO",
-				"SUCCESS",
-				"REDIRECT",
-				"ERROR_CLIENT",
-				"ERROR_SERVER",
-			];
+		const keys: (
+			| "INFO"
+			| "SUCCESS"
+			| "REDIRECT"
+			| "ERROR_CLIENT"
+			| "ERROR_SERVER"
+		)[] = ["INFO", "SUCCESS", "REDIRECT", "ERROR_CLIENT", "ERROR_SERVER"];
 		for (const _TYPE of keys) {
 			const entries = Object.entries(HTTP_STATUS[_TYPE]) as [string, StatusEntry][];
 			for (const [_KEY, data] of entries) {

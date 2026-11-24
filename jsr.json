@@ -2,9 +2,7 @@
   "name": "@marianmeres/http-utils",
   "exports": "./src/mod.ts",
   "compilerOptions": {
-    "lib": [
-      "deno.window"
-    ]
+    "lib": ["deno.window"]
   },
   "publish": {
     "include": [
@@ -17,8 +15,6 @@
       "LICENSE",
       ".editorconfig"
     ],
-    "exclude": [
-      "tests/consumer"
-    ]
+    "exclude": ["tests/consumer"]
   }
 }

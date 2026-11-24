@@ -313,15 +313,15 @@ export const createHttpError = (
 	cause = _maybeJsonParse(cause);
 
 	// try to find the well known one, otherwise fallback to generic
-	const ctor = _wellKnownCtorMap[`${code}` as keyof typeof _wellKnownCtorMap] ??
-		HttpError;
+	const ctor =
+		_wellKnownCtorMap[`${code}` as keyof typeof _wellKnownCtorMap] ?? HttpError;
 
 	//
 	const found = HTTP_STATUS.findByCode(code);
 	const statusText = found?.TEXT ?? fallback.TEXT;
 
 	//
-	let e = new ctor(message || statusText, { cause });
+	const e = new ctor(message || statusText, { cause });
 	e.status = found?.CODE ?? fallback.CODE;
 	e.statusText = statusText;
 	e.body = body;
@@ -399,11 +399,11 @@ export const getErrorMessage = (e: unknown, stripErrorPrefix = true): string => 
 			(typeof body === "object" ? body?.error_description : null) ||
 			// JSON:API / generic errors[] — first entry's detail/title/message, else string
 			(typeof body === "object" && Array.isArray(body?.errors)
-				? (typeof body.errors[0] === "string"
+				? typeof body.errors[0] === "string"
 					? body.errors[0]
-					: ((body.errors[0] as Record<string, unknown>)?.detail ||
+					: (body.errors[0] as Record<string, unknown>)?.detail ||
 						(body.errors[0] as Record<string, unknown>)?.title ||
-						(body.errors[0] as Record<string, unknown>)?.message))
+						(body.errors[0] as Record<string, unknown>)?.message
 				: null) ||
 			// fallback: body.error as plain string (e.g. OAuth error code without description)
 			(typeof body === "object" ? body?.error : null) ||

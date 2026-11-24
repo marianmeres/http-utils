@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { fetchOrThrow } from "../src/mod.ts";
 import { getErrorMessage, HTTP_ERROR } from "../src/error.ts";
+import { fetchOrThrow } from "../src/mod.ts";
 import { serve } from "./_helpers.ts";
 
 // Reserved TLD per RFC 6761 — guaranteed not to resolve, on any runtime.
@@ -85,9 +85,13 @@ test("fetchOrThrow onRequest fires before a successful request", async () => {
 
 test("fetchOrThrow onRequest reports the method (from init and from Request)", async () => {
 	let fromInit: string | undefined;
-	await fetchOrThrow(DEAD_HOST, { method: "POST" }, {
-		onRequest: (i) => (fromInit = i.method),
-	}).catch(() => {}); // transport fails; we only assert onRequest ran first
+	await fetchOrThrow(
+		DEAD_HOST,
+		{ method: "POST" },
+		{
+			onRequest: (i) => (fromInit = i.method),
+		},
+	).catch(() => {}); // transport fails; we only assert onRequest ran first
 	assert.deepStrictEqual(fromInit, "POST");
 
 	let fromRequest: string | undefined;
@@ -127,9 +131,13 @@ test("fetchOrThrow onError fires with kind 'abort' and preserves the original er
 	controller.abort();
 	let captured: { error: unknown; kind: string; reason: string } | undefined;
 	try {
-		await fetchOrThrow(DEAD_HOST, { signal: controller.signal }, {
-			onError: (i) => (captured = i),
-		});
+		await fetchOrThrow(
+			DEAD_HOST,
+			{ signal: controller.signal },
+			{
+				onError: (i) => (captured = i),
+			},
+		);
 		assert.ok(false); // must not be reached
 	} catch (e) {
 		// abort must NOT be masked as a NetworkError
@@ -164,12 +172,12 @@ test("fetchOrThrow onResponse fires after a successful request", async () => {
 	let calls = 0;
 	let info:
 		| {
-			url: string;
-			method?: string;
-			status: number;
-			ok: boolean;
-			durationMs: number;
-		}
+				url: string;
+				method?: string;
+				status: number;
+				ok: boolean;
+				durationMs: number;
+		  }
 		| undefined;
 	const r = await fetchOrThrow(new URL("data:text/plain,hello"), undefined, {
 		onResponse: (i) => {

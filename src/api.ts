@@ -192,10 +192,7 @@ type BaseFetchParams = BaseParams & FetchParams;
  * @param response - The raw Response object.
  * @returns A human-readable error message string.
  */
-export type ErrorMessageExtractor = (
-	body: unknown,
-	response: Response,
-) => string;
+export type ErrorMessageExtractor = (body: unknown, response: Response) => string;
 
 /**
  * Object to receive response headers after a request completes.
@@ -572,10 +569,11 @@ export async function fetchOrThrow(
 	const onError = opts.onError ?? _FOT_GLOBAL.onError;
 
 	// Resolved once and reused for whichever observers are present.
-	const method = (onRequest || onResponse)
-		? ((init as { method?: string } | undefined)?.method ??
-			(input instanceof Request ? input.method : undefined))
-		: undefined;
+	const method =
+		onRequest || onResponse
+			? ((init as { method?: string } | undefined)?.method ??
+				(input instanceof Request ? input.method : undefined))
+			: undefined;
 
 	if (onRequest) {
 		onRequest({ url: _describeFetchTarget(input), method, what: label });
@@ -604,11 +602,12 @@ export async function fetchOrThrow(
 		return response;
 	} catch (err) {
 		const name = (err as Error)?.name;
-		const kind: "abort" | "timeout" | "network" = name === "AbortError"
-			? "abort"
-			: name === "TimeoutError"
-			? "timeout"
-			: "network";
+		const kind: "abort" | "timeout" | "network" =
+			name === "AbortError"
+				? "abort"
+				: name === "TimeoutError"
+					? "timeout"
+					: "network";
 
 		// Preserve deliberate cancellations and timeouts as-is.
 		if (kind !== "network") {
@@ -816,7 +815,9 @@ const _fetch = async (
 		// prettier-ignore
 		try {
 			body = JSON.parse(text);
-		} catch (_e) { /* ignore parse errors */ }
+		} catch (_e) {
+			/* ignore parse errors */
+		}
 	}
 
 	params.assert ??= true; // default is true
@@ -850,7 +851,8 @@ const _fetch = async (
 			return msg;
 		};
 
-		let msg = tryExtract(errorMessageExtractor) ??
+		let msg =
+			tryExtract(errorMessageExtractor) ??
 			tryExtract(createHttpApi.defaultErrorMessageExtractor) ??
 			builtIn(body, r);
 
@@ -906,18 +908,14 @@ const _fetch = async (
  */
 export class HttpApi {
 	#base?: string | null;
-	#defaults?:
-		| Partial<BaseFetchParams>
-		| (() => Promise<Partial<BaseFetchParams>>);
+	#defaults?: Partial<BaseFetchParams> | (() => Promise<Partial<BaseFetchParams>>);
 	#factoryErrorMessageExtractor?: ErrorMessageExtractor | null | undefined;
 	#requestInterceptor?: RequestInterceptor | null;
 	#responseInterceptor?: ResponseInterceptor | null;
 
 	constructor(
 		base?: string | null,
-		defaults?:
-			| Partial<BaseFetchParams>
-			| (() => Promise<Partial<BaseFetchParams>>),
+		defaults?: Partial<BaseFetchParams> | (() => Promise<Partial<BaseFetchParams>>),
 		factoryErrorMessageExtractor?: ErrorMessageExtractor | null | undefined,
 	) {
 		this.#base = base;
@@ -933,10 +931,7 @@ export class HttpApi {
 		this.url = this.url.bind(this);
 	}
 
-	#merge<T = unknown>(
-		a: Record<string, unknown>,
-		b: Record<string, unknown>,
-	): T {
+	#merge<T = unknown>(a: Record<string, unknown>, b: Record<string, unknown>): T {
 		return deepMerge<T>(a, b);
 	}
 
@@ -1172,12 +1167,7 @@ export class HttpApi {
 			params: fetchParams,
 			respHeaders: headers,
 			errorExtractor,
-		} = parseDataOptions(
-			dataOrOptions,
-			params,
-			respHeaders,
-			errorMessageExtractor,
-		);
+		} = parseDataOptions(dataOrOptions, params, respHeaders, errorMessageExtractor);
 
 		path = this.#buildPath(path, this.#base);
 		return _fetch(
@@ -1238,9 +1228,7 @@ export class HttpApi {
  */
 export function createHttpApi(
 	base?: string | null,
-	defaults?:
-		| Partial<BaseFetchParams>
-		| (() => Promise<Partial<BaseFetchParams>>),
+	defaults?: Partial<BaseFetchParams> | (() => Promise<Partial<BaseFetchParams>>),
 	factoryErrorMessageExtractor?: ErrorMessageExtractor | null | undefined,
 ): HttpApi {
 	return new HttpApi(base, defaults, factoryErrorMessageExtractor);
