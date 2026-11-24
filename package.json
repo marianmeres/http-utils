@@ -1,6 +1,6 @@
 {
   "name": "@marianmeres/http-utils",
-  "version": "2.12.0",
+  "version": "3.0.0",
   "description": "Lightweight HTTP client wrapper for native fetch: type-safe error classes mapped to HTTP status codes (404 → NotFound, 401 → Unauthorized, …), auto JSON parsing, Bearer tokens, base URLs, timeouts, interceptors and transport errors that name the host and the real reason.",
   "license": "MIT",
   "author": "Marian Meres",
