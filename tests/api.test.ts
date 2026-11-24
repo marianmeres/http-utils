@@ -1,7 +1,7 @@
-import { assert, assertEquals } from "@std/assert";
+import assert from "node:assert/strict";
+import { afterEach, beforeEach, test } from "node:test";
 import { createHttpApi, fetchOrThrow, HTTP_ERROR } from "../src/mod.ts";
-import { getAvailablePort, hostname } from "./_helpers.ts";
-import { register } from "node:module";
+import { hostname, serve, type TestServer } from "./_helpers.ts";
 
 // Helper types for test assertions
 type ErrorBody = { error: { message: string } };
@@ -16,7 +16,7 @@ type DumpedParams = {
 
 const CUSTOM_ERR_MSG = "this is custom error";
 
-async function createTestServer(port: number): Promise<Deno.HttpServer> {
+function createTestServer(): Promise<TestServer> {
 	const handler = async (req: Request): Promise<Response> => {
 		const url = new URL(req.url);
 		const headers = new Headers({
@@ -48,24 +48,23 @@ async function createTestServer(port: number): Promise<Deno.HttpServer> {
 		}
 	};
 
-	return Deno.serve({ hostname, port, onListen: () => {} }, handler);
+	return serve({ hostname }, handler);
 }
 
 let url: string;
-let server: Deno.HttpServer;
+let server: TestServer;
 
-Deno.test.beforeEach(async () => {
-	const port = await getAvailablePort();
-	url = `http://${hostname}:${port}`;
-	server = await createTestServer(port);
+beforeEach(async () => {
+	server = await createTestServer();
+	url = `http://${hostname}:${server.port}`;
 });
 
-Deno.test.afterEach(async () => {
+afterEach(async () => {
 	await server.shutdown();
 });
 
 // Tests with isolated server instances
-Deno.test("createHttpApi GET", async () => {
+test("createHttpApi GET", async () => {
 	const api = createHttpApi();
 	const respHeaders: Record<string, string | number> = {};
 
@@ -73,19 +72,19 @@ Deno.test("createHttpApi GET", async () => {
 		string,
 		unknown
 	>;
-	assertEquals(r.foo, "bar");
-	assertEquals(respHeaders.__http_status_code__, 200);
+	assert.deepStrictEqual(r.foo, "bar");
+	assert.deepStrictEqual(respHeaders.__http_status_code__, 200);
 });
 
-Deno.test("createHttpApi GET with headers", async () => {
+test("createHttpApi GET with headers", async () => {
 	const api = createHttpApi(url);
 	const r = await api.get<Record<string, unknown>>("/echo", {
 		headers: { "X-Hey": "Ho" },
 	});
-	assertEquals(r["x-hey"], "Ho");
+	assert.deepStrictEqual(r["x-hey"], "Ho");
 });
 
-Deno.test("createHttpApi base option", async () => {
+test("createHttpApi base option", async () => {
 	const api = createHttpApi(url);
 	const respHeaders: Record<string, string | number> = {};
 
@@ -93,56 +92,56 @@ Deno.test("createHttpApi base option", async () => {
 		string,
 		unknown
 	>;
-	assertEquals(r.foo, "bar");
-	assertEquals(respHeaders.__http_status_code__, 200);
-	assertEquals(api.base, url);
+	assert.deepStrictEqual(r.foo, "bar");
+	assert.deepStrictEqual(respHeaders.__http_status_code__, 200);
+	assert.deepStrictEqual(api.base, url);
 });
 
-Deno.test("createHttpApi RAW", async () => {
+test("createHttpApi RAW", async () => {
 	const api = createHttpApi();
 
 	// raw
 	const r = await api.get(`${url}/echo`, { raw: true });
-	assert(r instanceof Response);
+	assert.ok(r instanceof Response);
 	await r.text(); // consume response body to prevent leak
 
 	// off-topic
-	assertEquals(api.base, undefined);
-	assertEquals(api.url("/foo"), "/foo");
+	assert.deepStrictEqual(api.base, undefined);
+	assert.deepStrictEqual(api.url("/foo"), "/foo");
 	api.base = url;
-	assertEquals(api.base, url);
-	assertEquals(api.url("/foo"), url + "/foo");
+	assert.deepStrictEqual(api.base, url);
+	assert.deepStrictEqual(api.url("/foo"), url + "/foo");
 });
 
-Deno.test("createHttpApi error", async () => {
+test("createHttpApi error", async () => {
 	const api = createHttpApi();
 
 	try {
 		await api.get(`${url}/asdf`);
-		assert(false); // must not be reached
+		assert.ok(false); // must not be reached
 	} catch (e) {
-		assert(e instanceof HTTP_ERROR.NotFound);
-		assertEquals((e.body as ErrorBody).error.message, CUSTOM_ERR_MSG);
-		assertEquals((e.cause as ErrorCause).response.headers.hey, "ho");
+		assert.ok(e instanceof HTTP_ERROR.NotFound);
+		assert.deepStrictEqual((e.body as ErrorBody).error.message, CUSTOM_ERR_MSG);
+		assert.deepStrictEqual((e.cause as ErrorCause).response.headers.hey, "ho");
 	}
 });
 
-Deno.test("createHttpApi transport failure surfaces NetworkError", async () => {
+test("createHttpApi transport failure surfaces NetworkError", async () => {
 	const api = createHttpApi();
 
 	try {
 		// reserved TLD (RFC 6761) — guaranteed DNS failure
 		await api.get("http://does-not-exist.invalid");
-		assert(false); // must not be reached
+		assert.ok(false); // must not be reached
 	} catch (e) {
-		assert(e instanceof HTTP_ERROR.NetworkError);
-		assert((e as Error).message.includes("does-not-exist.invalid"));
+		assert.ok(e instanceof HTTP_ERROR.NetworkError);
+		assert.ok((e as Error).message.includes("does-not-exist.invalid"));
 		// the method is used as the label
-		assert((e as Error).message.includes("GET unreachable"));
+		assert.ok((e as Error).message.includes("GET unreachable"));
 	}
 });
 
-Deno.test("createHttpApi requests trigger fetchOrThrow.global hooks", async () => {
+test("createHttpApi requests trigger fetchOrThrow.global hooks", async () => {
 	// HttpApi routes every request through fetchOrThrow, so a single global
 	// default instruments the client too.
 	let calls = 0;
@@ -156,24 +155,24 @@ Deno.test("createHttpApi requests trigger fetchOrThrow.global hooks", async () =
 	try {
 		const api = createHttpApi();
 		await api.get(`${url}/echo`);
-		assertEquals(calls, 1);
-		assert(seenUrl.includes("/echo"));
-		assertEquals(seenMethod, "GET");
+		assert.deepStrictEqual(calls, 1);
+		assert.ok(seenUrl.includes("/echo"));
+		assert.deepStrictEqual(seenMethod, "GET");
 	} finally {
 		fetchOrThrow.global.onRequest = undefined;
 	}
 });
 
-Deno.test("createHttpApi error { raw: true }", async () => {
+test("createHttpApi error { raw: true }", async () => {
 	const api = createHttpApi();
 
 	const r = await api.get(`${url}/asdf`, { raw: true });
-	assert(r instanceof Response);
-	assert(!r.ok);
+	assert.ok(r instanceof Response);
+	assert.ok(!r.ok);
 	await r.text(); // consume response body to prevent leak
 });
 
-Deno.test("createHttpApi error { assert: false } does not throw", async () => {
+test("createHttpApi error { assert: false } does not throw", async () => {
 	const api = createHttpApi();
 	const respHeaders: Record<string, string | number> = {};
 
@@ -182,11 +181,11 @@ Deno.test("createHttpApi error { assert: false } does not throw", async () => {
 		{ assert: false },
 		respHeaders,
 	)) as Record<string, unknown>;
-	assertEquals((r.error as Record<string, unknown>).message, CUSTOM_ERR_MSG);
-	assertEquals(respHeaders.__http_status_code__, 404);
+	assert.deepStrictEqual((r.error as Record<string, unknown>).message, CUSTOM_ERR_MSG);
+	assert.deepStrictEqual(respHeaders.__http_status_code__, 404);
 });
 
-Deno.test("custom local error message extractor", async () => {
+test("custom local error message extractor", async () => {
 	const api = createHttpApi();
 
 	try {
@@ -200,16 +199,16 @@ Deno.test("custom local error message extractor", async () => {
 				).error.message.toUpperCase();
 			},
 		);
-		assert(false); // must not be reached
+		assert.ok(false); // must not be reached
 	} catch (e) {
-		assert(e instanceof HTTP_ERROR.NotFound);
-		assertEquals(e.message, CUSTOM_ERR_MSG.toUpperCase());
-		assertEquals((e.body as ErrorBody).error.message, CUSTOM_ERR_MSG);
-		assertEquals((e.cause as ErrorCause).response.headers.hey, "ho");
+		assert.ok(e instanceof HTTP_ERROR.NotFound);
+		assert.deepStrictEqual(e.message, CUSTOM_ERR_MSG.toUpperCase());
+		assert.deepStrictEqual((e.body as ErrorBody).error.message, CUSTOM_ERR_MSG);
+		assert.deepStrictEqual((e.cause as ErrorCause).response.headers.hey, "ho");
 	}
 });
 
-Deno.test("custom factory error message extractor", async () => {
+test("custom factory error message extractor", async () => {
 	const api = createHttpApi(
 		undefined,
 		undefined,
@@ -222,16 +221,16 @@ Deno.test("custom factory error message extractor", async () => {
 
 	try {
 		await api.get(`${url}/asdf`);
-		assert(false); // must not be reached
+		assert.ok(false); // must not be reached
 	} catch (e) {
-		assert(e instanceof HTTP_ERROR.NotFound);
-		assertEquals(e.message, CUSTOM_ERR_MSG.toUpperCase());
-		assertEquals((e.body as ErrorBody).error.message, CUSTOM_ERR_MSG);
-		assertEquals((e.cause as ErrorCause).response.headers.hey, "ho");
+		assert.ok(e instanceof HTTP_ERROR.NotFound);
+		assert.deepStrictEqual(e.message, CUSTOM_ERR_MSG.toUpperCase());
+		assert.deepStrictEqual((e.body as ErrorBody).error.message, CUSTOM_ERR_MSG);
+		assert.deepStrictEqual((e.cause as ErrorCause).response.headers.hey, "ho");
 	}
 });
 
-Deno.test("custom global error message extractor", async () => {
+test("custom global error message extractor", async () => {
 	createHttpApi.defaultErrorMessageExtractor = (
 		body: unknown,
 		_resp: Response,
@@ -245,16 +244,16 @@ Deno.test("custom global error message extractor", async () => {
 
 	try {
 		await api.get(`${url}/asdf`);
-		assert(false); // must not be reached
+		assert.ok(false); // must not be reached
 	} catch (e) {
-		assert(e instanceof HTTP_ERROR.NotFound);
-		assertEquals(e.message, CUSTOM_ERR_MSG.toUpperCase());
-		assertEquals((e.body as ErrorBody).error.message, CUSTOM_ERR_MSG);
-		assertEquals((e.cause as ErrorCause).response.headers.hey, "ho");
+		assert.ok(e instanceof HTTP_ERROR.NotFound);
+		assert.deepStrictEqual(e.message, CUSTOM_ERR_MSG.toUpperCase());
+		assert.deepStrictEqual((e.body as ErrorBody).error.message, CUSTOM_ERR_MSG);
+		assert.deepStrictEqual((e.cause as ErrorCause).response.headers.hey, "ho");
 	}
 });
 
-Deno.test("createHttpApi POST", async () => {
+test("createHttpApi POST", async () => {
 	const api = createHttpApi();
 	const respHeaders: Record<string, string | number> = {};
 
@@ -264,12 +263,12 @@ Deno.test("createHttpApi POST", async () => {
 		{ headers: { x: "yo" } },
 		respHeaders,
 	)) as Record<string, unknown>;
-	assertEquals(r.hey, "ho");
-	assertEquals(respHeaders.__http_status_code__, 200);
-	assertEquals(respHeaders.x, "yo");
+	assert.deepStrictEqual(r.hey, "ho");
+	assert.deepStrictEqual(respHeaders.__http_status_code__, 200);
+	assert.deepStrictEqual(respHeaders.x, "yo");
 });
 
-Deno.test("createHttpApi merge default params", async () => {
+test("createHttpApi merge default params", async () => {
 	const api = createHttpApi(null, {
 		headers: { authorization: "Bearer foo" },
 		// @ts-expect-error testing that invalid props are ignored
@@ -287,21 +286,21 @@ Deno.test("createHttpApi merge default params", async () => {
 		true,
 	)) as DumpedParams;
 
-	assertEquals(params.headers.authorization, "Bearer foo");
-	assertEquals(params.headers.hey, "ho");
-	assertEquals(params.method, "POST");
-	assertEquals(params.path, "/hoho");
-	assertEquals(params.credentials, "include");
-	assertEquals(params.data.foo, "bar");
+	assert.deepStrictEqual(params.headers.authorization, "Bearer foo");
+	assert.deepStrictEqual(params.headers.hey, "ho");
+	assert.deepStrictEqual(params.method, "POST");
+	assert.deepStrictEqual(params.path, "/hoho");
+	assert.deepStrictEqual(params.credentials, "include");
+	assert.deepStrictEqual(params.data.foo, "bar");
 });
 
-Deno.test("url build", () => {
-	assertEquals(createHttpApi().url("/foo"), "/foo");
-	assertEquals(
+test("url build", () => {
+	assert.deepStrictEqual(createHttpApi().url("/foo"), "/foo");
+	assert.deepStrictEqual(
 		createHttpApi("http://example").url("/foo"),
 		"http://example/foo",
 	);
-	assertEquals(
+	assert.deepStrictEqual(
 		createHttpApi("http://ignored").url("http://another/foo"),
 		"http://another/foo",
 	);

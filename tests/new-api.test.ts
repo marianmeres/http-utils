@@ -1,9 +1,10 @@
-import { assert, assertEquals } from "@std/assert";
+import assert from "node:assert/strict";
+import { afterEach, beforeEach, test } from "node:test";
 import { createHttpApi, opts } from "../src/mod.ts";
-import { getAvailablePort, hostname } from "./_helpers.ts";
+import { hostname, serve, type TestServer } from "./_helpers.ts";
 
 // Test server setup
-async function createTestServer(port: number): Promise<Deno.HttpServer> {
+function createTestServer(): Promise<TestServer> {
 	const handler = async (req: Request): Promise<Response> => {
 		const url = new URL(req.url);
 		const headers = new Headers({
@@ -29,23 +30,22 @@ async function createTestServer(port: number): Promise<Deno.HttpServer> {
 		}
 	};
 
-	return Deno.serve({ hostname, port, onListen: () => {} }, handler);
+	return serve({ hostname }, handler);
 }
 
 let url: string;
-let server: Deno.HttpServer;
+let server: TestServer;
 
-Deno.test.beforeEach(async () => {
-	const port = await getAvailablePort();
-	url = `http://${hostname}:${port}`;
-	server = await createTestServer(port);
+beforeEach(async () => {
+	server = await createTestServer();
+	url = `http://${hostname}:${server.port}`;
 });
 
-Deno.test.afterEach(async () => {
+afterEach(async () => {
 	await server.shutdown();
 });
 
-Deno.test("new API: GET with options object", async () => {
+test("new API: GET with options object", async () => {
 	const api = createHttpApi(url);
 	const respHeaders: Record<string, string | number> = {};
 
@@ -58,12 +58,12 @@ Deno.test("new API: GET with options object", async () => {
 		}),
 	)) as Record<string, unknown>;
 
-	assertEquals(data.message, "GET response");
-	assertEquals(respHeaders.__http_status_code__, 200);
-	assertEquals(respHeaders["x-custom"], "test-value");
+	assert.deepStrictEqual(data.message, "GET response");
+	assert.deepStrictEqual(respHeaders.__http_status_code__, 200);
+	assert.deepStrictEqual(respHeaders["x-custom"], "test-value");
 });
 
-Deno.test("new API: POST with options object", async () => {
+test("new API: POST with options object", async () => {
 	const api = createHttpApi(url);
 	const respHeaders: Record<string, string | number> = {};
 
@@ -77,13 +77,13 @@ Deno.test("new API: POST with options object", async () => {
 		}),
 	)) as Record<string, unknown>;
 
-	assertEquals(data.name, "John");
-	assertEquals(data.age, 30);
-	assertEquals(respHeaders.__http_status_code__, 200);
-	assertEquals(respHeaders["x-custom"], "post-test");
+	assert.deepStrictEqual(data.name, "John");
+	assert.deepStrictEqual(data.age, 30);
+	assert.deepStrictEqual(respHeaders.__http_status_code__, 200);
+	assert.deepStrictEqual(respHeaders["x-custom"], "post-test");
 });
 
-Deno.test("new API: GET with minimal options", async () => {
+test("new API: GET with minimal options", async () => {
 	const api = createHttpApi(url);
 
 	// Just params, no respHeaders - requires opts() wrapper
@@ -94,10 +94,10 @@ Deno.test("new API: GET with minimal options", async () => {
 		}),
 	)) as Record<string, unknown>;
 
-	assertEquals(data.message, "GET response");
+	assert.deepStrictEqual(data.message, "GET response");
 });
 
-Deno.test("new API: POST without data field (should work)", async () => {
+test("new API: POST without data field (should work)", async () => {
 	const api = createHttpApi(url);
 
 	// Options object without data field (data will be null) - requires opts() wrapper
@@ -110,10 +110,10 @@ Deno.test("new API: POST without data field (should work)", async () => {
 
 	// Server echoes empty body (JSON.stringify(null) = "null", but empty body might be "")
 	// Just verify it doesn't crash
-	assert(data === null || data === "");
+	assert.ok(data === null || data === "");
 });
 
-Deno.test("backward compatibility: legacy GET API still works", async () => {
+test("backward compatibility: legacy GET API still works", async () => {
 	const api = createHttpApi(url);
 	const respHeaders: Record<string, string | number> = {};
 
@@ -124,12 +124,12 @@ Deno.test("backward compatibility: legacy GET API still works", async () => {
 		respHeaders,
 	)) as Record<string, unknown>;
 
-	assertEquals(data.message, "GET response");
-	assertEquals(respHeaders.__http_status_code__, 200);
-	assertEquals(respHeaders["x-custom"], "legacy");
+	assert.deepStrictEqual(data.message, "GET response");
+	assert.deepStrictEqual(respHeaders.__http_status_code__, 200);
+	assert.deepStrictEqual(respHeaders["x-custom"], "legacy");
 });
 
-Deno.test("backward compatibility: legacy POST API still works", async () => {
+test("backward compatibility: legacy POST API still works", async () => {
 	const api = createHttpApi(url);
 	const respHeaders: Record<string, string | number> = {};
 
@@ -141,7 +141,7 @@ Deno.test("backward compatibility: legacy POST API still works", async () => {
 		respHeaders,
 	)) as Record<string, unknown>;
 
-	assertEquals(data.name, "Jane");
-	assertEquals(respHeaders.__http_status_code__, 200);
-	assertEquals(respHeaders["x-custom"], "legacy-post");
+	assert.deepStrictEqual(data.name, "Jane");
+	assert.deepStrictEqual(respHeaders.__http_status_code__, 200);
+	assert.deepStrictEqual(respHeaders["x-custom"], "legacy-post");
 });
