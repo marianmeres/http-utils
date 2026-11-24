@@ -74,7 +74,7 @@ export class HTTP_STATUS {
 		UNAUTHORIZED: { CODE: 401, TEXT: "Unauthorized" },
 		PAYMENT_REQUIRED_EXPERIMENTAL: {
 			CODE: 402,
-			TEXT: "Payment Required Experimental",
+			TEXT: "Payment Required",
 		},
 		FORBIDDEN: { CODE: 403, TEXT: "Forbidden" },
 		NOT_FOUND: { CODE: 404, TEXT: "Not Found" },
@@ -99,7 +99,7 @@ export class HTTP_STATUS {
 		UNPROCESSABLE_CONTENT: { CODE: 422, TEXT: "Unprocessable Content" },
 		LOCKED: { CODE: 423, TEXT: "Locked" },
 		FAILED_DEPENDENCY: { CODE: 424, TEXT: "Failed Dependency" },
-		TOO_EARLY_EXPERIMENTAL: { CODE: 425, TEXT: "Too Early Experimental" },
+		TOO_EARLY_EXPERIMENTAL: { CODE: 425, TEXT: "Too Early" },
 		UPGRADE_REQUIRED: { CODE: 426, TEXT: "Upgrade Required" },
 		PRECONDITION_REQUIRED: { CODE: 428, TEXT: "Precondition Required" },
 		TOO_MANY_REQUESTS: { CODE: 429, TEXT: "Too Many Requests" },

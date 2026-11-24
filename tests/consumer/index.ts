@@ -12,11 +12,18 @@ import {
 	type ErrorMessageExtractor,
 	type FetchOrThrowGlobalOptions,
 	fetchOrThrow,
+	getBodyMessage,
+	getErrorMessage,
 	HTTP_ERROR,
 	HTTP_STATUS,
 	type HttpApiGlobalOptions,
 	type HttpErrorCause,
+	type HttpErrorLike,
 	opts,
+	PROBLEM_MEDIA_TYPE,
+	type ProblemDetails,
+	type ProblemSource,
+	problemOf,
 } from "@marianmeres/http-utils";
 
 // fetchOrThrow.global
@@ -42,4 +49,51 @@ const cause = notFound.cause as HttpErrorCause | undefined;
 // findByCode takes a string too (it compares with ==)
 const text: string | undefined = HTTP_STATUS.findByCode("404")?.TEXT;
 
-export { apiGlobal, cause, fotGlobal, id, status, text };
+// Problem Details: the typed members of an error, and the two readers
+const problem: ProblemDetails = notFound.problem;
+const type: string = notFound.type;
+const requested: [string | undefined, string | undefined] = [
+	notFound.method,
+	notFound.url,
+];
+const source: ProblemSource = { status: 409, mediaType: PROBLEM_MEDIA_TYPE };
+const read: ProblemDetails = problemOf({ title: "Conflict" }, source);
+const fromResponse: ProblemDetails = problemOf("{}", new Response(null, { status: 500 }));
+const sentence: string | null = getBodyMessage({ detail: "x" });
+
+// HttpErrorLike: this package's own error is one, and so is a class written without
+// it (a refusal keyed by its problem type, with its own narrower problem type)
+interface OwnProblem {
+	type: string;
+	title: string;
+	status: number;
+	detail?: string;
+	code?: string;
+}
+class ApiError extends Error {
+	readonly status: number = 409;
+	readonly body: unknown = null;
+	readonly problem: OwnProblem = { type: "urn:x", title: "Conflict", status: 409 };
+	readonly method: string = "GET";
+	readonly url: string = "/x";
+}
+const likeOwn: HttpErrorLike = notFound;
+const likeTheirs = new ApiError("x") satisfies HttpErrorLike;
+const message: string = getErrorMessage(likeTheirs);
+
+export {
+	apiGlobal,
+	cause,
+	fotGlobal,
+	fromResponse,
+	id,
+	likeOwn,
+	message,
+	problem,
+	read,
+	requested,
+	sentence,
+	status,
+	text,
+	type,
+};

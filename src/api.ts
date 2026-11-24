@@ -5,7 +5,13 @@
  * Provides a convenient wrapper over the native `fetch` API with sensible defaults.
  */
 
-import { createHttpError, getErrorMessage, NetworkError } from "./error.ts";
+import {
+	_attachRequest,
+	createHttpError,
+	getErrorMessage,
+	NetworkError,
+} from "./error.ts";
+import { getBodyMessage, statusTextOf } from "./problem.ts";
 
 /**
  * Request body data type.
@@ -188,6 +194,12 @@ type BaseFetchParams = BaseParams & FetchParams;
 
 /**
  * Function to extract error messages from failed HTTP responses.
+ *
+ * Replaces the built-in reading of the body (`getBodyMessage`) for the requests it
+ * applies to. To decorate that reading instead of replacing it, call it yourself:
+ * `(body, response) => getBodyMessage(body) ?? response.statusText`. An empty result
+ * falls back to the status phrase.
+ *
  * @param body - The parsed response body.
  * @param response - The raw Response object.
  * @returns A human-readable error message string.
@@ -651,6 +663,9 @@ fetchOrThrow.global = _FOT_GLOBAL as FetchOrThrowGlobalOptions;
  * console.error(`${ctx.method} ${ctx.url} → ${ctx.response.status}`);
  * ```
  *
+ * The method and the URL are also on the error itself, typed (`err.method`,
+ * `err.url`); come here for the response headers.
+ *
  * Note this is NOT the `cause` of a `NetworkError` — a transport failure never
  * produced a response, and carries the underlying transport error as its cause
  * instead (its URL is already embedded in the message).
@@ -697,7 +712,7 @@ export interface HttpErrorCause {
  * ```
  */
 export type ErrorUrlFormatter = (info: {
-	/** The fully resolved request URL (same value as `cause.url`). */
+	/** The fully resolved request URL (same value as the error's `url`). */
 	url: string;
 	/** The request method. */
 	method: string;
@@ -749,6 +764,14 @@ const _HTTPAPI_GLOBAL: HttpApiGlobalOptions =
 	((globalThis as any)[_HTTPAPI_GLOBAL_KEY] ??= {
 		appendUrlToErrorMessage: false,
 	});
+
+// The slot behind `createHttpApi.defaultErrorMessageExtractor`, shared the same way.
+const _EXTRACTOR_GLOBAL_KEY = Symbol.for(
+	"@marianmeres/http-utils/createHttpApi.defaultErrorMessageExtractor",
+);
+const _EXTRACTOR_GLOBAL: { current: ErrorMessageExtractor | null | undefined } =
+	// deno-lint-ignore no-explicit-any
+	((globalThis as any)[_EXTRACTOR_GLOBAL_KEY] ??= { current: null });
 
 const _fetch = async (
 	params: BaseFetchParams,
@@ -824,9 +847,9 @@ const _fetch = async (
 
 	if (!r.ok && params.assert) {
 		// Now we need to extract an error message from an unknown response shape.
-		// We try, in order: the per-call extractor, the factory/global, and a
-		// built-in guess. If a user-provided extractor throws, we must not let
-		// it replace the real HTTP error — fall back to statusText.
+		// We try, in order: the per-call extractor, the factory/global, and the
+		// built-in reading. If a user-provided extractor throws, we must not let
+		// it replace the real HTTP error — the next one in line answers.
 		const tryExtract = (
 			fn: ErrorMessageExtractor | null | undefined,
 		): string | null => {
@@ -838,15 +861,10 @@ const _fetch = async (
 			}
 		};
 
-		const builtIn: ErrorMessageExtractor = (_body, _response) => {
-			const b = _body as Record<string, unknown> | null;
-			let msg: string = String(
-				(b?.error as Record<string, unknown>)?.message ||
-					b?.message ||
-					b?.error ||
-					_response?.statusText ||
-					"Unknown error",
-			);
+		// The body's own sentence, read the way `getErrorMessage` reads it, so the
+		// thrown `message` and `getErrorMessage(error)` agree on what the server said.
+		const builtIn: ErrorMessageExtractor = (_body) => {
+			let msg = getBodyMessage(_body) ?? "";
 			if (msg.length > 255) msg = `[Shortened]: ${msg.slice(0, 255)}`;
 			return msg;
 		};
@@ -855,6 +873,10 @@ const _fetch = async (
 			tryExtract(errorMessageExtractor) ??
 			tryExtract(createHttpApi.defaultErrorMessageExtractor) ??
 			builtIn(body, r);
+
+		// Nothing was said: the status speaks. The reason phrase the server sent,
+		// or the standard one for the status when there is none (HTTP/2 has none).
+		if (typeof msg !== "string" || msg.trim() === "") msg = statusTextOf(r);
 
 		// `r.url` is the runtime-resolved final URL (correct through redirects),
 		// but it is empty for a synthetic Response — e.g. one returned by a
@@ -897,7 +919,13 @@ const _fetch = async (
 			},
 		};
 
-		throw createHttpError(r.status, msg, body, cause);
+		const error = createHttpError(r.status, msg, body, cause);
+		_attachRequest(error, {
+			method: params.method,
+			url: resolvedUrl,
+			mediaType: r.headers.get("content-type"),
+		});
+		throw error;
 	}
 
 	return body;
@@ -1237,18 +1265,20 @@ export function createHttpApi(
 /**
  * Global default error message extractor.
  * Applied to all requests unless overridden at instance or request level.
- * Priority: per-request → per-instance → global → built-in fallback.
+ * Priority: per-request → per-instance → global → built-in reading of the body
+ * (`getBodyMessage`), then the status phrase. Shared by every bundled copy of this
+ * package.
  *
  * A throwing extractor will not crash the call — the next priority level is
  * used as a fallback.
  *
  * Its contract is "what did the server say", so do NOT use it to fold in request
  * context: it is bypassed by any per-request or per-instance extractor, and it
- * replaces the built-in body-shape digging instead of decorating it. To get the
- * request URL into error messages, use
+ * replaces the built-in reading of the body (call `getBodyMessage` from it to
+ * decorate that reading instead). To get the request URL into error messages, use
  * {@link HttpApiGlobalOptions.appendUrlToErrorMessage} instead — it is applied
  * after extraction and cannot be bypassed. The URL is also always available,
- * message flag or not, on the error's `cause` (see {@link HttpErrorCause}).
+ * message flag or not, as the error's `url`.
  *
  * @example
  * ```ts
@@ -1261,6 +1291,19 @@ createHttpApi.defaultErrorMessageExtractor = null as
 	| ErrorMessageExtractor
 	| null
 	| undefined;
+
+// The assignment above declares the property (and its type, for the published
+// `.d.ts`). This turns it into an accessor over a slot on `globalThis`, so that
+// setting it once reaches every bundled copy of this package — as
+// `createHttpApi.global` and `fetchOrThrow.global` do.
+Object.defineProperty(createHttpApi, "defaultErrorMessageExtractor", {
+	get: () => _EXTRACTOR_GLOBAL.current,
+	set: (extractor: ErrorMessageExtractor | null | undefined) => {
+		_EXTRACTOR_GLOBAL.current = extractor;
+	},
+	enumerable: true,
+	configurable: true,
+});
 
 /**
  * Global options shared by every {@link HttpApi} instance (and by multiple bundled

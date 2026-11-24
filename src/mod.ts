@@ -42,5 +42,17 @@ export {
 	type ResponseHeaders,
 	type ResponseInterceptor,
 } from "./api.ts";
-export { createHttpError, getErrorMessage, HTTP_ERROR } from "./error.ts";
+export {
+	createHttpError,
+	getErrorMessage,
+	HTTP_ERROR,
+	type HttpErrorLike,
+} from "./error.ts";
+export {
+	getBodyMessage,
+	PROBLEM_MEDIA_TYPE,
+	type ProblemDetails,
+	type ProblemSource,
+	problemOf,
+} from "./problem.ts";
 export { HTTP_STATUS } from "./status.ts";

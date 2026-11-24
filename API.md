@@ -13,6 +13,7 @@ Complete API reference for `@marianmeres/http-utils`.
 - [Interceptors](#interceptors)
 - [Types](#types)
 - [HTTP Errors](#http-errors)
+- [Problem Details](#problem-details)
 - [HTTP Status Codes](#http-status-codes)
 - [Utilities](#utilities)
 
@@ -80,11 +81,25 @@ createHttpApi.defaultErrorMessageExtractor = (body, response) => {
 };
 ```
 
-Priority order: per-request > per-instance > global > built-in fallback.
+Priority order: per-request > per-instance > global > the built-in reading of the body
+([`getBodyMessage`](#getbodymessage)). Whichever answers, an empty result falls back to
+the status phrase: the one the server sent, or the standard one for the status.
+
+An extractor _replaces_ the built-in reading. To decorate it instead, call it yourself:
+
+```ts
+import { createHttpApi, getBodyMessage } from "@marianmeres/http-utils";
+
+createHttpApi.defaultErrorMessageExtractor = (body, response) =>
+	`[${response.status}] ${getBodyMessage(body) ?? response.statusText}`;
+```
+
+The property is shared by every bundled copy of this package (via `Symbol.for` +
+`globalThis`), like [`createHttpApi.global`](#createhttpapiglobal): set it once at the
+app entry point.
 
 Its contract is _"what did the server say"_. Do not use it to fold in request context: it
-is bypassed by any per-request or per-instance extractor, and it replaces the built-in
-body-shape digging rather than decorating it. Use
+is bypassed by any per-request or per-instance extractor. Use
 [`createHttpApi.global.appendUrlToErrorMessage`](#createhttpapiglobal) for that.
 
 #### `createHttpApi.global`
@@ -99,7 +114,7 @@ interface HttpApiGlobalOptions {
 }
 
 type ErrorUrlFormatter = (info: {
-	url: string; // fully resolved request URL (same value as `cause.url`)
+	url: string; // fully resolved request URL (same value as `error.url`)
 	method: string;
 	path: string; // resolved against `base`, without the query string
 	status: number;
@@ -124,8 +139,8 @@ shipped log line is the only diagnostic artifact you get.
   server's message only.
 - `NetworkError` messages are left alone: they already embed the URL.
 
-The URL is available on the error's [`cause`](#httperror-base-class) whether or not this
-flag is on.
+The URL is available as [`error.url`](#httperror-base-class) whether or not this flag is
+on.
 
 **Passing a formatter.** With `true`, the URL is appended verbatim, query string included
 — if your URLs carry credentials, they land wherever those messages do. Pass an
@@ -147,7 +162,7 @@ error. A formatter that **throws** also appends nothing — it deliberately does
 back to the raw URL, since failing closed is the only safe direction for something whose
 job may be redaction.
 
-Note this affects the message only. `cause.url` always carries the unredacted URL — it is
+Note this affects the message only. `error.url` always carries the unredacted URL — it is
 structured context, not a string that gets rendered.
 
 ---
@@ -585,11 +600,14 @@ Special keys added after request:
 
 Function to extract error messages from failed HTTP responses. If the extractor throws,
 the call falls back to the next-priority extractor (per-instance → global → built-in)
-instead of crashing.
+instead of crashing. If it returns an empty string, the message is the status phrase.
 
 ```ts
 type ErrorMessageExtractor = (body: unknown, response: Response) => string;
 ```
+
+`body` is the parsed response body: JSON when it parsed, the text otherwise, `null` when
+empty.
 
 ### RequestInterceptor
 
@@ -619,12 +637,78 @@ All errors extend `HttpError` base class.
 
 ```ts
 class HttpError extends Error {
+	message: string; // what the server said — see "The message" below
 	status: number; // HTTP status code
 	statusText: string; // HTTP status text
 	body: unknown; // Response body (auto-parsed as JSON)
+	readonly problem: ProblemDetails; // the body as an RFC 9457 document
+	readonly type: string; // problem.type — the identity to branch on
+	method?: string; // request method (errors thrown by an HttpApi method)
+	url?: string; // fully resolved request URL (errors thrown by an HttpApi method)
 	cause: unknown; // Error cause/details — see HttpErrorCause below
 }
 ```
+
+#### The message
+
+For an error thrown by an `HttpApi` method, `message` is the one sentence found in the
+response body, read by [`getBodyMessage`](#getbodymessage): an RFC 9457 `detail` or
+`title`, `error.message`, `message`, an OAuth `error_description`, the first entry of
+`errors[]`, or the body itself when it is plain text. The built-in reading cuts it at 255
+characters (`"[Shortened]: …"`).
+
+When the body carries no such sentence (it is empty, an HTML error page, or a JSON shape
+that names none), the message is the status phrase: the reason phrase the server sent, or
+the standard one for the status when there is none, as over HTTP/2. So it reads
+`"Bad Gateway"`, never `"Unknown error"`.
+
+An [`ErrorMessageExtractor`](#errormessageextractor) replaces this reading per request,
+per instance or globally, and
+[`appendUrlToErrorMessage`](#createhttpapiglobal) decorates the result.
+
+#### `problem` and `type`
+
+`problem` is the response read as an RFC 9457 Problem Details document by
+[`problemOf`](#problemof), and `type` is its `type` member. Both are always there: a
+response that is not a problem document is `"about:blank"`, with the status phrase as its
+`title`. See [Problem Details](#problem-details).
+
+```ts
+if (error instanceof HTTP_ERROR.HttpError) {
+	if (error.type === "urn:example:error:conflict") {
+		// the same refusal, whether it arrived as a 409 or as a 412
+	}
+}
+```
+
+#### `method` and `url`
+
+Set on errors thrown by an `HttpApi` method: the request method, and the fully resolved
+URL (base + path + query string; post-redirect where the runtime reports it, the
+requested URL for a synthetic `Response` returned by an
+[`onResponse` interceptor](#onresponseinterceptor)). Absent on an error you construct
+yourself and on `NetworkError`, whose message carries the URL.
+
+```ts
+log.error(`${error.method} ${error.url} → ${error.status}: ${error.message}`);
+```
+
+#### `instanceof` across copies
+
+Two packages that each installed their own copy of this package do not share class
+objects. The classes are therefore matched by a key that every copy shares: an error
+thrown by one copy is an `instanceof` the same class of another.
+
+```ts
+// thrown by a dependency that bundles its own copy
+error instanceof HTTP_ERROR.Unauthorized; // true
+error instanceof HTTP_ERROR.HttpError; // true
+```
+
+- A subclass of your own keeps plain `instanceof` semantics.
+- An object that merely looks like an error of this package is not an instance.
+- This holds between copies of 3.x and later. A 2.x copy has no such key, so a 2.x copy
+  and a 3.x copy do not recognize each other's errors.
 
 #### `HttpErrorCause`
 
@@ -648,11 +732,13 @@ interface HttpErrorCause {
 ```ts
 import type { HttpErrorCause } from "@marianmeres/http-utils";
 
-const { method, url } = error.cause as HttpErrorCause;
-log.error(`${method} ${url} → ${error.status}: ${error.message}`);
+const { response } = error.cause as HttpErrorCause;
+const retryAfter = response.headers["retry-after"];
 ```
 
-`url` is the value to log — `path` is the pre-query value and is kept only for backwards
+`method` and `url` are the same values as [`error.method` and
+`error.url`](#method-and-url), which are typed and need no cast; come here for the
+response headers. `path` is the pre-query value and is kept only for backwards
 compatibility. Where the runtime reports a resolved URL (it does for a real `fetch`),
 `url` is post-redirect; for a synthetic `Response` returned by an
 [`onResponse` interceptor](#onresponseinterceptor) it falls back to the URL that was
@@ -714,6 +800,123 @@ try {
 		console.log("HTTP error:", error.status);
 	}
 }
+```
+
+---
+
+## Problem Details
+
+[RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) Problem Details (`application/problem+json`)
+is read out of the box. Every `HttpError` exposes the response as a problem document
+([`error.problem`, `error.type`](#problem-and-type)), and the two functions that do the
+reading are exported for code that calls `fetch` itself or defines its own error class.
+
+### ProblemDetails
+
+```ts
+interface ProblemDetails {
+	type: string; // a URI identifying the problem type, or "about:blank"
+	title: string; // short summary of the type
+	status: number; // the HTTP status
+	detail?: string; // what went wrong this time
+	instance?: string; // a URI reference identifying this occurrence
+	[extension: string]: unknown; // whatever else the producer sent
+}
+```
+
+`type`, `title` and `status` are always present in what this package returns. Branch on
+`type`: a status groups unrelated refusals under one number, and `title` / `detail` are
+prose a producer may reword.
+
+### problemOf
+
+Reads a response body as a problem document. Never throws.
+
+```ts
+function problemOf(body: unknown, source: ProblemSource): ProblemDetails;
+
+interface ProblemSource {
+	status: number;
+	statusText?: string | null;
+	headers?: { get(name: string): string | null } | null; // read for content-type
+	mediaType?: string | null; // when there are no headers; wins over them
+}
+```
+
+**Parameters:**
+
+- `body` (unknown) — The response body, parsed or as text (JSON text is parsed).
+- `source` (ProblemSource) — The response it came with. A `Response` is one.
+
+**Returns:** `ProblemDetails`
+
+- A body is a problem document when it was served as `application/problem+json`, or when
+  it is a JSON object naming both a `type` and a `title` under any media type. Its
+  members are kept, and the required ones are completed the way RFC 9457 reads an
+  absence: `type` as `"about:blank"`, `status` as the response's, `title` as its reason
+  phrase. A `detail` or `instance` that is not a string is dropped.
+- Any other body (plain text, another JSON shape, an HTML page, nothing) is the
+  `"about:blank"` problem: the status phrase is the `title`, and the body's own sentence
+  ([`getBodyMessage`](#getbodymessage)), when it has one, is the `detail`.
+
+**Example:**
+
+```ts
+import { problemOf } from "@marianmeres/http-utils";
+
+const response = await fetch(url, init);
+if (!response.ok) {
+	const problem = problemOf(await response.text(), response);
+	if (problem.type === "urn:example:error:conflict") {
+		// ...
+	}
+	throw new Error(problem.detail ?? problem.title);
+}
+```
+
+```ts
+problemOf("Invalid token.", { status: 401 });
+// { type: "about:blank", title: "Unauthorized", status: 401, detail: "Invalid token." }
+
+problemOf("<html>…</html>", { status: 502 });
+// { type: "about:blank", title: "Bad Gateway", status: 502 }
+```
+
+### PROBLEM_MEDIA_TYPE
+
+`"application/problem+json"` — RFC 9457's media type.
+
+### HttpErrorLike
+
+The shape this package's generic error code reads: [`getErrorMessage`](#geterrormessage),
+and anything written against the data members of `HttpError`.
+
+```ts
+interface HttpErrorLike {
+	message: string;
+	status: number;
+	body: unknown;
+	problem?: { type: string; title: string; status: number; detail?: string };
+	method?: string;
+	url?: string;
+}
+```
+
+An error class of your own that has these members is read exactly like an `HttpError`,
+without extending it. Check the shape at compile time with a type-only import, which
+adds no runtime dependency on this package:
+
+```ts
+import type { HttpErrorLike } from "@marianmeres/http-utils";
+
+class ApiError extends Error {
+	readonly status: number;
+	readonly body: unknown;
+	// ...
+}
+
+// a compile error the day the two shapes drift apart
+null as unknown as ApiError satisfies HttpErrorLike;
 ```
 
 ---
@@ -905,14 +1108,14 @@ Returns a specific error class for well-known status codes.
 
 ```ts
 const error = createHttpError(404, "User not found", { userId: 123 });
-console.log(error instanceof NotFound); // true
+console.log(error instanceof HTTP_ERROR.NotFound); // true
 console.log(error.status); // 404
 console.log(error.body); // { userId: 123 }
 ```
 
 ### getErrorMessage
 
-Extracts a human-readable error message from various error formats.
+Extracts a human-readable error message from anything that was thrown.
 
 ```ts
 function getErrorMessage(e: unknown, stripErrorPrefix?: boolean): string;
@@ -920,12 +1123,26 @@ function getErrorMessage(e: unknown, stripErrorPrefix?: boolean): string;
 
 **Priority order:**
 
-1. `e.cause.message` / `e.cause.code` / `e.cause` (if string)
-2. `e.body.error.message` / `e.body.message` / `e.body.error` / `e.body` (if string)
-3. `e.message`
-4. `e.name`
-5. `e.toString()`
-6. `"Unknown Error"`
+1. `e.problem.detail` / `e.problem.title`, when the error carries a typed RFC 9457
+   problem document (a `problem.type` other than `"about:blank"`). Such an error speaks
+   for itself, so its sentence wins over its `cause`.
+2. `e.cause.message` / `e.cause.code` / `e.cause` (if string) / `e.cause.detail` /
+   `e.cause.error_description` / `e.cause.error.error_description` /
+   `e.cause.error.detail`
+3. the sentence in `e.body`, as [`getBodyMessage`](#getbodymessage) reads it
+4. `e.message`
+5. `e.code` (Node.js: `ECONNREFUSED`, `ENOENT`, …)
+6. `e.name`
+7. `e.toString()`
+8. `"Unknown Error"`
+
+Only a non-blank string (or a number) counts at any step. An object or an array found
+where a sentence was expected is skipped, so the result is never `"[object Object]"`, and
+a body that is markup (an HTML error page) is not a message.
+
+It reads any object of the [`HttpErrorLike`](#httperrorlike) shape, not only this
+package's own errors. With `stripErrorPrefix` (default `true`) a leading `"TypeError: "`
+style prefix is removed.
 
 **Example:**
 
@@ -937,4 +1154,45 @@ try {
 } catch (error) {
 	console.log(getErrorMessage(error)); // "Not Found"
 }
+```
+
+### getBodyMessage
+
+Extracts the one human-readable sentence a response body carries, or `null` when it
+carries none. This is what the `HttpApi` client builds an error's `message` from, and the
+body step of [`getErrorMessage`](#geterrormessage).
+
+```ts
+function getBodyMessage(body: unknown): string | null;
+```
+
+**Order:**
+
+1. `detail` of an RFC 9457 problem document (a body naming both `type` and `title`)
+2. `error.message`, `message`
+3. `error.error_description`, `error.detail`
+4. `detail`, `title` (RFC 9457 / DRF / FastAPI)
+5. `error_description` (OAuth 2)
+6. `errors[0]` (JSON:API; a string, or the entry's `detail` / `title` / `message`)
+7. `error` (a string)
+8. the body itself, when it is plain text
+
+- Only a non-blank string (or a number) counts. A member holding an object or an array is
+  skipped, and the next convention answers.
+- A plain-text body is trimmed and cut at 500 characters. One that is markup (it starts
+  with `<`) is not a message.
+- JSON text is parsed first, so a body may be passed as received.
+
+**Example:**
+
+```ts
+import { getBodyMessage } from "@marianmeres/http-utils";
+
+getBodyMessage({ type: "urn:example:conflict", title: "Conflict", detail: "Stale version." });
+// "Stale version."
+getBodyMessage({ error: { message: "Invalid token" } }); // "Invalid token"
+getBodyMessage({ error: "invalid_grant", error_description: "Token expired" }); // "Token expired"
+getBodyMessage("Email is required\n"); // "Email is required"
+getBodyMessage("<html>…</html>"); // null
+getBodyMessage({ detail: [{ msg: "required" }] }); // null
 ```

@@ -5,7 +5,31 @@
  * Provides specific error classes for well-known HTTP status codes.
  */
 
+import {
+	ABOUT_BLANK,
+	getBodyMessage,
+	maybeJsonParse,
+	type ProblemDetails,
+	problemOf,
+	recordOf,
+	textOf,
+} from "./problem.ts";
 import { HTTP_STATUS } from "./status.ts";
+
+/**
+ * The key a class of this package is registered under (`"NotFound"`, ...), set on the
+ * class itself. `Symbol.for`, so that every installed copy of the package reads and
+ * writes the same key: it is what lets `instanceof` recognize an error another copy
+ * threw (see `hasInstance` below).
+ */
+const KIND: unique symbol = Symbol.for("@marianmeres/http-utils/error-kind");
+
+/**
+ * The media type of the response an error's `body` came with, for the errors the
+ * `HttpApi` client throws. Kept beside the error instead of on it: it is one input of
+ * `HttpError.problem`, not a member worth reading on its own.
+ */
+const _mediaTypes = new WeakMap<object, string>();
 
 /**
  * Base HTTP error class. Extends Error with HTTP-specific properties.
@@ -32,6 +56,40 @@ class HttpError extends Error {
 	public statusText: string = HTTP_STATUS.ERROR_SERVER.INTERNAL_SERVER_ERROR.TEXT;
 	/** Response body (auto-parsed as JSON if possible) */
 	public body: unknown = null;
+	/**
+	 * The request method. Set on the errors an `HttpApi` method throws; absent on an
+	 * error you construct yourself.
+	 */
+	declare public method?: string;
+	/**
+	 * The fully resolved request URL (base, path, query string and, where the runtime
+	 * reports it, the post-redirect location). Set on the errors an `HttpApi` method
+	 * throws; absent on an error you construct yourself.
+	 */
+	declare public url?: string;
+
+	/**
+	 * The error as an RFC 9457 Problem Details document, read from `body` (see
+	 * `problemOf`). Always there: a body that is not a problem document is the
+	 * `"about:blank"` problem, whose `title` is the status phrase and whose `detail`
+	 * is the body's own sentence when it has one.
+	 */
+	get problem(): ProblemDetails {
+		return problemOf(this.body, {
+			status: this.status,
+			statusText: this.statusText,
+			mediaType: _mediaTypes.get(this),
+		});
+	}
+
+	/**
+	 * The problem's stable identity (`problem.type`): the member to branch on when the
+	 * server answers with typed problem documents, since one status covers unrelated
+	 * refusals. `"about:blank"` when the response named none.
+	 */
+	get type(): string {
+		return this.problem.type;
+	}
 }
 
 // Client error classes (4xx)
@@ -246,6 +304,104 @@ export const HTTP_ERROR = {
 	NetworkError,
 };
 
+/**
+ * `instanceof`, holding across installed copies of this package.
+ *
+ * Two packages that each resolved their own copy do not share class objects, so an
+ * error thrown by one would fail the other's `instanceof NotFound` and fall through
+ * to its generic handling. Every class of this package is registered under a key
+ * that all copies share ({@link KIND}), and an error whose prototype chain holds a
+ * class registered under the same key as the class asked about is an instance of it.
+ *
+ * A subclass of your own keeps plain `instanceof` semantics: it is registered under
+ * no key, so only the ordinary prototype walk answers for it.
+ *
+ * `this` is the class on the right-hand side of `instanceof`.
+ */
+function hasInstance(this: unknown, value: unknown): boolean {
+	// This copy's own instances, subclasses included.
+	if (Function.prototype[Symbol.hasInstance].call(this, value)) return true;
+	if (value === null || typeof value !== "object") return false;
+	if (typeof this !== "function" || !Object.hasOwn(this, KIND)) return false;
+	const kind = (this as unknown as Record<symbol, unknown>)[KIND];
+	for (
+		let proto: unknown = Object.getPrototypeOf(value);
+		proto !== null && typeof proto === "object";
+		proto = Object.getPrototypeOf(proto)
+	) {
+		const ctor: unknown = Object.hasOwn(proto, "constructor")
+			? (proto as { constructor: unknown }).constructor
+			: undefined;
+		if (
+			typeof ctor === "function" &&
+			Object.hasOwn(ctor, KIND) &&
+			(ctor as unknown as Record<symbol, unknown>)[KIND] === kind
+		) {
+			return true;
+		}
+	}
+	return false;
+}
+
+// On the base class, so every class below inherits it (statics are inherited).
+Object.defineProperty(HttpError, Symbol.hasInstance, { value: hasInstance });
+
+// Register every class under its `HTTP_ERROR` key. Own properties: a subclass of
+// yours must not inherit its parent's registration.
+for (const [kind, ctor] of Object.entries(HTTP_ERROR)) {
+	Object.defineProperty(ctor, KIND, { value: kind });
+}
+
+/**
+ * The shape this package's generic error code reads: `getErrorMessage`, and anything
+ * written against the data members of `HttpError`.
+ *
+ * An error class of your own that has these members is read exactly like an
+ * `HttpError`, without extending it. Check the shape at compile time with a type-only
+ * import, which adds no runtime dependency:
+ *
+ * ```ts
+ * import type { HttpErrorLike } from "@marianmeres/http-utils";
+ *
+ * class ApiError extends Error {
+ *   status: number;
+ *   body: unknown;
+ *   // ...
+ * }
+ * // a compile error the day the two shapes drift apart
+ * null as unknown as ApiError satisfies HttpErrorLike;
+ * ```
+ */
+export interface HttpErrorLike {
+	/** The error's own sentence. */
+	message: string;
+	/** The HTTP status of the response. */
+	status: number;
+	/** The response body: parsed JSON when it parsed, its text otherwise, or `null`. */
+	body: unknown;
+	/** The response as an RFC 9457 Problem Details document. */
+	problem?: { type: string; title: string; status: number; detail?: string };
+	/** The request method. */
+	method?: string;
+	/** The request URL. */
+	url?: string;
+}
+
+/**
+ * Records where an error came from. For the `HttpApi` client, which is the one place
+ * that has the request and the response in hand.
+ *
+ * @internal
+ */
+export function _attachRequest(
+	error: HttpError,
+	context: { method: string; url: string; mediaType?: string | null },
+): void {
+	error.method = context.method;
+	error.url = context.url;
+	if (context.mediaType) _mediaTypes.set(error, context.mediaType);
+}
+
 const _wellKnownCtorMap = {
 	"400": BadRequest,
 	"401": Unauthorized,
@@ -264,17 +420,6 @@ const _wellKnownCtorMap = {
 	"501": NotImplemented,
 	"502": BadGateway,
 	"503": ServiceUnavailable,
-};
-
-const _maybeJsonParse = (v: unknown): unknown => {
-	if (typeof v === "string") {
-		try {
-			return JSON.parse(v);
-		} catch (_e) {
-			// ignore parse errors
-		}
-	}
-	return v;
 };
 
 /**
@@ -309,8 +454,8 @@ export const createHttpError = (
 	if (isNaN(code) || !(code >= 400 && code < 600)) code = fallback.CODE;
 
 	// opinionated conventions
-	body = _maybeJsonParse(body);
-	cause = _maybeJsonParse(cause);
+	body = maybeJsonParse(body);
+	cause = maybeJsonParse(cause);
 
 	// try to find the well known one, otherwise fallback to generic
 	const ctor =
@@ -329,25 +474,53 @@ export const createHttpError = (
 	return e;
 };
 
+/** The text an object describes itself with, unless it is the default `[object X]`. */
+function ownToStringOf(value: Record<string, unknown>): string | undefined {
+	if (typeof value?.toString !== "function") return undefined;
+	const text = textOf(value.toString());
+	return text === undefined || /^\[object [^\]]*\]$/.test(text) ? undefined : text;
+}
+
+/** The sentence of a typed problem document: its `detail`, then its `title`. */
+function typedProblemMessageOf(problem: unknown): string | undefined {
+	const p = recordOf(problem);
+	if (!p || typeof p.type !== "string" || p.type === "" || p.type === ABOUT_BLANK) {
+		return undefined;
+	}
+	return textOf(p.detail) ?? textOf(p.title);
+}
+
 /**
  * Extracts a human-readable error message from various error formats.
  * Tries multiple strategies to find the best message, with fallbacks.
  *
  * Priority order:
- * 1. e.cause.message / e.cause.code / e.cause (if string)
- *    / e.cause.detail (RFC 7807) / e.cause.error_description (OAuth 2)
+ * 1. e.problem.detail / e.problem.title, when the error carries a typed RFC 9457
+ *    problem document (a `problem.type` other than `"about:blank"`). Such an error
+ *    speaks for itself, so its sentence wins over its `cause`.
+ * 2. e.cause.message / e.cause.code / e.cause (if string)
+ *    / e.cause.detail (RFC 9457) / e.cause.error_description (OAuth 2)
  *    / e.cause.error.error_description / e.cause.error.detail
- * 2. e.body.error.message / e.body.message
+ * 3. the sentence in e.body (see `getBodyMessage`): a problem document's detail
+ *    / e.body.error.message / e.body.message
  *    / e.body.error.error_description / e.body.error.detail
- *    / e.body.detail (RFC 7807 / DRF / FastAPI) / e.body.title (RFC 7807)
+ *    / e.body.detail (RFC 9457 / DRF / FastAPI) / e.body.title (RFC 9457)
  *    / e.body.error_description (OAuth 2)
  *    / e.body.errors[0] (JSON:API; first entry's detail/title/message, or string)
- *    / e.body.error / e.body (if string)
- * 3. e.message
- * 4. e.code (Node.js: ECONNREFUSED, ENOENT, ...)
- * 5. e.name
- * 6. e.toString()
- * 7. "Unknown Error"
+ *    / e.body.error (if string) / e.body (if plain text)
+ * 4. e.message
+ * 5. e.code (Node.js: ECONNREFUSED, ENOENT, ...)
+ * 6. e.name
+ * 7. e.toString()
+ * 8. "Unknown Error"
+ *
+ * Only a non-blank string (or a number) counts at any step: an object or an array
+ * found where a sentence was expected is skipped, never rendered as
+ * `"[object Object]"`. A body that is markup (an HTML error page) is not a message,
+ * and a plain-text one is cut at 500 characters.
+ *
+ * Works on any object of the {@link HttpErrorLike} shape, not only on this package's
+ * own `HttpError`.
  *
  * @param e - The error to extract a message from (can be any type).
  * @param stripErrorPrefix - Whether to remove "Error: " prefix from the message (default: true).
@@ -360,65 +533,39 @@ export const getErrorMessage = (e: unknown, stripErrorPrefix = true): string => 
 	// Errors may bubble from various sources which are not always under control.
 	// We try our best to extract a meaningful message using common conventions.
 	const err = e as Record<string, unknown>;
-	const cause = _maybeJsonParse(err?.cause) as Record<string, unknown> | string | null;
-	const body = _maybeJsonParse(err?.body) as Record<string, unknown> | string | null;
+	const cause = maybeJsonParse(err?.cause);
+	const causeRecord = recordOf(cause);
+	const causeError = recordOf(causeRecord?.error);
 
-	let msg: string = String(
+	let msg: string =
+		// A typed problem document is the error's own, complete statement. Its
+		// `cause` is what lies underneath (a driver error, the request context),
+		// and must not replace the sentence the producer chose to give.
+		typedProblemMessageOf(err?.problem) ??
 		// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/cause
-		// e.cause is the standard prop for error details, so should be considered as
-		// the most authoritative (if available)
+		// For every other error, e.cause is the standard prop for error details, so
+		// it is considered the most authoritative (if available).
 		// "code" and "message" are my own conventions
-		(typeof cause === "object" ? cause?.message : null) ||
-			(typeof cause === "object" ? cause?.code : null) ||
-			(typeof cause === "string" ? cause : null) ||
-			// additional well-known cause shapes (RFC 7807, OAuth 2, nested OAuth)
-			(typeof cause === "object" ? cause?.detail : null) ||
-			(typeof cause === "object" ? cause?.error_description : null) ||
-			(typeof cause === "object"
-				? (cause?.error as Record<string, unknown>)?.error_description
-				: null) ||
-			(typeof cause === "object"
-				? (cause?.error as Record<string, unknown>)?.detail
-				: null) ||
-			// non-standard "body" is this package's HttpError prop
-			(typeof body === "object"
-				? (body?.error as Record<string, unknown>)?.message
-				: null) ||
-			(typeof body === "object" ? body?.message : null) ||
-			// nested under body.error (OAuth-style nested + RFC 7807 nested)
-			(typeof body === "object"
-				? (body?.error as Record<string, unknown>)?.error_description
-				: null) ||
-			(typeof body === "object"
-				? (body?.error as Record<string, unknown>)?.detail
-				: null) ||
-			// RFC 7807 (Problem Details) / DRF / FastAPI
-			(typeof body === "object" ? body?.detail : null) ||
-			(typeof body === "object" ? body?.title : null) ||
-			// OAuth 2 (RFC 6749) — must precede `body.error` so error_description wins over the error code
-			(typeof body === "object" ? body?.error_description : null) ||
-			// JSON:API / generic errors[] — first entry's detail/title/message, else string
-			(typeof body === "object" && Array.isArray(body?.errors)
-				? typeof body.errors[0] === "string"
-					? body.errors[0]
-					: (body.errors[0] as Record<string, unknown>)?.detail ||
-						(body.errors[0] as Record<string, unknown>)?.title ||
-						(body.errors[0] as Record<string, unknown>)?.message
-				: null) ||
-			// fallback: body.error as plain string (e.g. OAuth error code without description)
-			(typeof body === "object" ? body?.error : null) ||
-			(typeof body === "string" ? body : null) ||
-			// the common message from Error ctor (e.g. "Foo" if new TypeError("Foo"))
-			err?.message ||
-			// Node.js error code fallback (e.g. "ECONNREFUSED") when message is empty
-			err?.code ||
-			// the Error class name (e.g. TypeError)
-			err?.name ||
-			// this should handle (almost) everything else (mainly if e is not an Error instance)
-			(typeof err?.toString === "function" ? err.toString() : null) ||
-			// very last fallback if `toString()` was not available (or returned empty)
-			"Unknown Error",
-	);
+		textOf(causeRecord?.message) ??
+		textOf(causeRecord?.code) ??
+		(typeof cause === "string" ? textOf(cause) : undefined) ??
+		// additional well-known cause shapes (RFC 9457, OAuth 2, nested OAuth)
+		textOf(causeRecord?.detail) ??
+		textOf(causeRecord?.error_description) ??
+		textOf(causeError?.error_description) ??
+		textOf(causeError?.detail) ??
+		// non-standard "body" is this package's HttpError prop
+		getBodyMessage(err?.body) ??
+		// the common message from Error ctor (e.g. "Foo" if new TypeError("Foo"))
+		textOf(err?.message) ??
+		// Node.js error code fallback (e.g. "ECONNREFUSED") when message is empty
+		textOf(err?.code) ??
+		// the Error class name (e.g. TypeError)
+		textOf(err?.name) ??
+		// this should handle (almost) everything else (mainly if e is not an Error instance)
+		ownToStringOf(err) ??
+		// very last fallback if `toString()` was not available (or said nothing)
+		"Unknown Error";
 
 	if (stripErrorPrefix) {
 		msg = msg.replace(/^[^:]*Error: /i, "");

@@ -14,6 +14,8 @@ convenient defaults.
 - 🪶 **Lightweight** - Zero dependencies, thin wrapper over native `fetch`
 - 🎨 **Flexible error handling** - Three-tier error message extraction (local → factory →
   global)
+- 📄 **Reads Problem Details** - an RFC 9457 response becomes the error's message and a
+  stable `error.type` to branch on, with nothing to configure
 - 🛰️ **No swallowed transport errors** - DNS/connection failures surface the host and real
   reason instead of an opaque "fetch failed"
 - 📦 **Universal** - Web standards only: browsers, Node and any modern runtime
@@ -38,7 +40,7 @@ import { createHttpApi, HTTP_ERROR, opts } from "@marianmeres/http-utils";
 ## Quick Start
 
 ```ts
-import { createHttpApi, HTTP_ERROR, NotFound, opts } from "@marianmeres/http-utils";
+import { createHttpApi, HTTP_ERROR, opts } from "@marianmeres/http-utils";
 
 // Create an API client with base URL
 const api = createHttpApi("https://api.example.com", {
@@ -78,12 +80,9 @@ const created = await api.post<User>("/users", opts({ data: { name: "Jane" } }))
 try {
 	await api.get("/not-found");
 } catch (error) {
-	if (error instanceof NotFound) {
-		console.log("Resource not found");
-	}
-	// or use the namespace
 	if (error instanceof HTTP_ERROR.NotFound) {
 		console.log(error.status); // 404
+		console.log(error.message); // what the server said
 		console.log(error.body); // Response body
 	}
 }
@@ -145,13 +144,13 @@ This makes the API unambiguous and prevents accidental misinterpretation of requ
 ### Error Handling
 
 ```ts
-import { HTTP_ERROR, NotFound } from "@marianmeres/http-utils";
+import { HTTP_ERROR } from "@marianmeres/http-utils";
 
 try {
 	await api.get("/resource");
 } catch (error) {
-	if (error instanceof NotFound) {
-		console.log("Not found:", error.body);
+	if (error instanceof HTTP_ERROR.NotFound) {
+		console.log("Not found:", error.message, error.body);
 	}
 	// Transport-level failures (DNS, refused connection, unreachable host) throw
 	// a NetworkError (status 0) instead of an opaque "fetch failed":
@@ -159,9 +158,48 @@ try {
 		console.log(error.message); // e.g. "GET unreachable (https://...): ECONNREFUSED"
 		console.log(error.cause); // underlying transport error
 	}
-	// All errors have: status, statusText, body, cause
+	// All errors have: status, statusText, body, problem, type, cause
+	// (and method, url when an HttpApi method threw them)
 }
 ```
+
+**The message is what the server said.** The error's `message` is the one sentence found
+in the response body: an RFC 9457 `detail` (or `title`), `error.message`, `message`, an
+OAuth `error_description`, the first of `errors[]`, or the body itself when it is plain
+text. A body that says nothing readable (empty, an HTML error page, an unknown JSON
+shape) leaves the status phrase, `"Bad Gateway"`. See
+[`getBodyMessage`](API.md#getbodymessage) for the exact order, and
+[the extractors](API.md#createhttpapidefaulterrormessageextractor) to replace it.
+
+### Problem Details (RFC 9457)
+
+When a server refuses with `application/problem+json`, branch on the problem's `type`,
+not on the status. One status covers unrelated refusals, and the `type` is the part of
+the document meant to stay stable:
+
+```ts
+try {
+	await api.patch(`/orders/${id}`, changes);
+} catch (error) {
+	if (error instanceof HTTP_ERROR.HttpError) {
+		switch (error.type) {
+			case "urn:example:error:conflict":
+				return askWhichVersionToKeep();
+			case "urn:example:error:validation":
+				return showFieldErrors(error.problem.errors);
+		}
+		showError(error.message); // the problem's `detail`, or its `title`
+	}
+	throw error;
+}
+```
+
+`error.problem` is always there. A response that is not a problem document is RFC 9457's
+own `"about:blank"`: the status phrase as its `title`, and the body's sentence, when it
+has one, as its `detail`. So `error.type` needs no guard.
+
+The same reading is exported as [`problemOf(body, response)`](API.md#problemof) for code
+that calls `fetch` itself.
 
 ### Diagnosing Failures in Production
 
@@ -177,22 +215,22 @@ A transport failure never reached a server, so `fetchOrThrow` builds the message
 and puts the URL in it. A non-2xx _did_ reach one, so the message is whatever the server
 said — `"Bot backend unavailable"` and nothing more.
 
-The URL is always on the error's `cause` (fully resolved: base + path + query, and
-post-redirect where the runtime reports it):
+The URL is always on the error itself, with the method (fully resolved: base + path +
+query, and post-redirect where the runtime reports it):
 
 ```ts
-import type { HttpErrorCause } from "@marianmeres/http-utils";
-
 try {
 	await api.get("/resource");
 } catch (error) {
-	// status > 0 excludes NetworkError, whose cause is the transport error instead
+	// status > 0 excludes NetworkError, which never got a response
 	if (error instanceof HTTP_ERROR.HttpError && error.status > 0) {
-		const { method, url } = error.cause as HttpErrorCause;
-		log.error(`${method} ${url} → ${error.status}: ${error.message}`);
+		log.error(`${error.method} ${error.url} → ${error.status}: ${error.message}`);
 	}
 }
 ```
+
+The response headers are on the error's `cause` (see
+[`HttpErrorCause`](API.md#httperrorcause)).
 
 If the shipped log line is the only artifact you get — you log `error.message` and nothing
 else — opt in to having the URL appended to the message itself:
@@ -222,7 +260,7 @@ createHttpApi.global.appendUrlToErrorMessage = ({ method, url, status }) =>
 	status >= 500 ? `${method} ${url}` : "";
 ```
 
-This affects the message only — `cause.url` always carries the unredacted URL.
+This affects the message only — `error.url` always carries the unredacted URL.
 
 ### Key Features
 
@@ -240,9 +278,11 @@ This affects the message only — `cause.url` always carries the unredacted URL.
 - **AbortController**: Pass `signal` for request cancellation (composes with `timeout`)
 - **Interceptors**: `api.onRequest(...)` / `api.onResponse(...)` for tracing, auth
   refresh, etc.
-- **Diagnosable errors**: every HTTP error carries the fully resolved request URL on its
-  `cause`; opt in to `createHttpApi.global.appendUrlToErrorMessage` to get it in `message`
-  too
+- **Diagnosable errors**: every HTTP error carries the request method and the fully
+  resolved URL (`error.method`, `error.url`); opt in to
+  `createHttpApi.global.appendUrlToErrorMessage` to get them in `message` too
+- **One identity across copies**: `instanceof HTTP_ERROR.NotFound` holds for an error
+  thrown by another installed copy of this package
 - **Typed responses**: Use generics for type-safe responses: `api.get<User>("/users/1")`
 
 ### Query, Timeout, Interceptors
@@ -317,7 +357,9 @@ See [API.md](./API.md#fetchorthrow) for the full options reference.
 
 ### `getErrorMessage(error)`
 
-Extracts human-readable messages from any error format:
+Extracts a human-readable message from anything that was thrown: this package's errors,
+a plain `Error`, a string, or another package's error class that has the same members
+(the exported [`HttpErrorLike`](API.md#httperrorlike) type):
 
 ```ts
 import { getErrorMessage } from "@marianmeres/http-utils";
@@ -329,6 +371,8 @@ try {
 }
 ```
 
+It never answers `"[object Object]"` or the source of an HTML error page.
+
 ### `createHttpError(code, message?, body?, cause?)`
 
 Manually create HTTP errors:
@@ -337,8 +381,45 @@ Manually create HTTP errors:
 import { createHttpError } from "@marianmeres/http-utils";
 
 const error = createHttpError(404, "User not found", { userId: 123 });
-throw error; // instanceof NotFound
+throw error; // instanceof HTTP_ERROR.NotFound
 ```
+
+## Upgrading from 2.x
+
+3.0 changes what a thrown error says, so check anything that matches on `message`.
+
+- **`message` of an `HttpApi` error.** 2.x read `error.message`, `message` and `error`
+  from the body, and used the status text for everything else. 3.0 reads every convention
+  [`getBodyMessage`](API.md#getbodymessage) knows, so an RFC 9457 `detail`, an OAuth
+  `error_description` or a plain-text body is now the message where it used to be
+  `"Bad Request"`. Branch on `status` or `type` instead of the text. To keep the 2.x
+  reading:
+
+  ```ts
+  createHttpApi.defaultErrorMessageExtractor = (body: any, response) =>
+  	String(body?.error?.message || body?.message || body?.error || response.statusText);
+  ```
+
+- **No more `"Unknown error"`.** When nothing readable was said, the message is the
+  status phrase: the server's, or the standard one for the status when there is none (as
+  over HTTP/2). An extractor that returns an empty string gets the same fallback.
+- **`getErrorMessage`.** An error carrying a typed problem document (`error.problem.type`
+  other than `"about:blank"`) answers with that document's `detail` or `title` before its
+  `cause`. Members that are not a string or a number are skipped instead of rendered as
+  `"[object Object]"`, a body that is markup is not a message, and a plain-text body is
+  trimmed and cut at 500 characters.
+- **New members on `HttpError`.** `problem` and `type` (getters), and `method` and `url`
+  on errors an `HttpApi` method threw (these two are own properties, so they appear in
+  `JSON.stringify(error)`). A subclass of yours that declares a member with one of these
+  names has to agree with them.
+- **`instanceof` across copies.** Classes are matched by a key every copy shares, so an
+  error from another installed copy of 3.x is an instance here. That does not reach back:
+  a 2.x copy and a 3.x copy do not recognize each other's errors, so move the packages of
+  one install together.
+- **`createHttpApi.defaultErrorMessageExtractor`** is shared by every bundled copy of the
+  package, as `createHttpApi.global` already was.
+- **`HTTP_STATUS`** text of 402 and 425 is `"Payment Required"` and `"Too Early"` (the
+  keys keep their `_EXPERIMENTAL` suffix).
 
 ## Development
 
